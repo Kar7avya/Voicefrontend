@@ -597,7 +597,7 @@ export default function Upload() {
 
       // NO AUTHORIZATION HEADER NEEDED
       // The correct way to access and use the environment variable
-const uploadRes = await fetch(`${BACKEND_URL}/upload`, {
+const uploadRes = await fetch(`${BACKEND_URL}/api/upload`, {
   method: "POST",
   body: formData,
 });
@@ -629,7 +629,7 @@ const uploadRes = await fetch(`${BACKEND_URL}/upload`, {
       toast.info("🖼️ Extracting frames (if video)...");
       const extractForm = new FormData();
       extractForm.append("videoName", uploadedFilename);
-      const extractRes = await fetch(`${BACKEND_URL}/extractFrames`, {
+      const extractRes = await fetch(`${BACKEND_URL}/api/extractFrames`, {
     method: "POST",
     body: extractForm,
 });
@@ -641,7 +641,7 @@ const uploadRes = await fetch(`${BACKEND_URL}/upload`, {
 
       // Frame Analysis
       toast.info("🤖 Analyzing frames with Gemini (if video)...");
-      const analyzeRes = await fetch(`${BACKEND_URL}/analyzeAllFrames`);
+      const analyzeRes = await fetch(`${BACKEND_URL}/api/analyzeAllFrames`);
       if (!analyzeRes.ok) {
         toast.warn("🤖 Frame analysis skipped or failed (might be an audio file).");
       } else {
@@ -655,7 +655,7 @@ const uploadRes = await fetch(`${BACKEND_URL}/upload`, {
       toast.info("🗣️ Transcribing with ElevenLabs...");
       const elevenForm = new FormData();
       elevenForm.append("videoName", uploadedFilename);
-      const elevenRes = await fetch(`${BACKEND_URL}/transcribeWithElevenLabs`, {  
+      const elevenRes = await fetch(`${BACKEND_URL}/api/transcribeWithElevenLabs`, {  
         method: "POST",
         body: elevenForm,
       });
@@ -670,7 +670,7 @@ const uploadRes = await fetch(`${BACKEND_URL}/upload`, {
       toast.info("🧠 Transcribing with Deepgram...");
       const deepgramForm = new FormData();
       deepgramForm.append("videoName", uploadedFilename);
-      const deepgramRes = await fetch(`${BACKEND_URL}/transcribeWithDeepgram`, { 
+      const deepgramRes = await fetch(`${BACKEND_URL}/api/transcribeWithDeepgram`, { 
         method: "POST",
         body: deepgramForm,
       });
@@ -686,7 +686,7 @@ const uploadRes = await fetch(`${BACKEND_URL}/upload`, {
       if (deepgramTranscript && deepgramTranscript !== "No transcript from Deepgram") {
         toast.info("✨ Analyzing speech with Gemini...");
         try {
-          const analysisRes = await fetch(`${BACKEND_URL}/analyzeSpeechWithGemini`, {  
+          const analysisRes = await fetch(`${BACKEND_URL}/api/analyzeSpeechWithGemini`, {  
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ transcript: deepgramTranscript, videoName: uploadedFilename }),
@@ -727,7 +727,7 @@ const uploadRes = await fetch(`${BACKEND_URL}/upload`, {
 
     try {
       toast.info("✨ Analyzing text with Gemini...");
-      const analysisRes = await fetch(`${BACKEND_URL}/analyzeSpeechWithGemini`, {  
+      const analysisRes = await fetch(`${BACKEND_URL}/api/analyzeSpeechWithGemini`, {  
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transcript: manualTranscript }),
