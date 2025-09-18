@@ -251,31 +251,45 @@ const SignUp = () => {
     }));
   }
 
-  // Helper function to create profile manually if auto-creation fails
+  // Helper function to create profile using the safe database function
   const createUserProfile = async (user) => {
     try {
-      const { data, error } = await supabase
+      // First try the database function approach
+      const { data, error } = await supabase.rpc('create_user_profile', {
+        p_auth_user_id: user.id,
+        p_email: user.email,
+        p_full_name: formData.fullname || ''
+      });
+
+      if (data || !error) {
+        console.log("✅ Profile created successfully via function");
+        return true;
+      }
+
+      // Fallback to direct insert if function fails
+      const { data: insertData, error: insertError } = await supabase
         .from('profiles')
         .insert({
           user_id: user.id,
           auth_user_id: user.id,
           email: user.email,
-          full_name: formData.fullname,
+          full_name: formData.fullname || '',
           total_videos: 0,
-          total_storage_used: 0,
-          last_activity: new Date().toISOString()
+          total_storage_used: 0
         })
         .select()
         .single();
 
-      if (error) {
-        console.log("Profile creation failed:", error);
-        // This is not critical - user can still use the app
+      if (insertError) {
+        console.log("Profile creation failed (fallback):", insertError);
+        return false;
       } else {
-        console.log("✅ Profile created successfully:", data);
+        console.log("✅ Profile created successfully (fallback):", insertData);
+        return true;
       }
     } catch (err) {
       console.log("Profile creation error (non-critical):", err);
+      return false;
     }
   };
 
@@ -340,8 +354,8 @@ const SignUp = () => {
       if (data.user && !data.session) {
         console.log("✅ Signup success, email confirmation required");
         
-        // Try to create profile manually (in case the trigger didn't work)
-        await createUserProfile(data.user);
+        // Create profile manually since we removed the trigger
+        const profileCreated = await createUserProfile(data.user);
         
         toast.success(
           `Verification email sent to ${formData.email}. Please confirm before login.`
@@ -353,8 +367,8 @@ const SignUp = () => {
         // User signed up and was immediately signed in
         console.log("✅ Signup success with active session:", data.session);
         
-        // Try to create profile manually (in case the trigger didn't work)
-        await createUserProfile(data.user);
+        // Create profile manually since we removed the trigger
+        const profileCreated = await createUserProfile(data.user);
         
         localStorage.setItem("access_token", data.session.access_token);
         localStorage.setItem("refresh_token", data.session.refresh_token);
