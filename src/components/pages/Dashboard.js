@@ -1371,7 +1371,7 @@ function Dashboard() {
 
   useEffect(() => {
     const fetchMetadata = async () => {
-      const API_URL = 'https://voicebackend-7.onrender.com/api/metadata';
+      const API_URL = 'https://voicebackend-11.onrender.com/api/metadata';
       try {
         setIsLoading(true);
         setError(null);
