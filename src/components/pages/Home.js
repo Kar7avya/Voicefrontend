@@ -142,10 +142,10 @@ import styled, { keyframes } from 'styled-components';
 import { FaRocket, FaPlayCircle, FaMicrophone, FaHandshake, FaChartLine } from 'react-icons/fa';
 
 // --- Animations ---
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-`;
+// const fadeIn = keyframes`
+//   from { opacity: 0; transform: translateY(20px); }
+//   to { opacity: 1; transform: translateY(0); }
+// `;
 
 const heroFadeIn = keyframes`
   from { opacity: 0; }
@@ -279,10 +279,10 @@ const FeaturesSection = styled.section`
   color: #1a1a1a;
 `;
 
-const SectionHeader = styled.div`
-  text-align: center;
-  margin-bottom: 4rem;
-`;
+// const SectionHeader = styled.div`
+//   text-align: center;
+//   margin-bottom: 4rem;
+// `;
 
 const SectionTitle = styled.h2`
   font-size: 2.5rem;

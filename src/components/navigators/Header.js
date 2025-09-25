@@ -8,7 +8,7 @@ import "bootstrap/dist/js/bootstrap.bundle.min.js";
 import image from "../pages/image.png";
 
 const Header = () => {
-  const [scrolled, setScrolled] = useState(false);
+  const [scrolled] = useState(false);
   const navigate = useNavigate();
 
   async function handleLogout() {
