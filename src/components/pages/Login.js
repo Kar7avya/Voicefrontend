@@ -1119,7 +1119,7 @@ const Login = () => {
           zIndex: 20,
           letterSpacing: "3px"
         }}>
-          AMLI
+          स्वराज
         </div>
 
         {/* Back to website button */}
