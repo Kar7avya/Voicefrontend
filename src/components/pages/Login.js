@@ -502,7 +502,7 @@ const Login = () => {
           zIndex: 20,
           letterSpacing: "3px"
         }}>
-          <img 
+          {/* <img 
   src={michand} 
   alt="Logo" 
   style={{
@@ -513,7 +513,7 @@ const Login = () => {
     padding: "10px",          // spacing inside circle
     objectFit: "cover"        // keeps image ratio
   }} 
-/>
+/> */}
 
         </div>
 
