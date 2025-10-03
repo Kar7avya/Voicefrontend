@@ -502,7 +502,7 @@ const Login = () => {
           zIndex: 20,
           letterSpacing: "3px"
         }}>
-          <img src={michand} alt="Logo" style={{ width: "100px", height: "auto" }} />
+          <img src={michand} alt="Logo" style={{ width: "70px", height: "70px" }} />
         </div>
 
         {/* Back to website button */}
