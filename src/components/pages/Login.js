@@ -1207,7 +1207,7 @@ const Login = () => {
             )}
           </button>
 
-          <div style={{
+          {/* <div style={{
             display: "flex",
             alignItems: "center",
             gap: "1rem",
@@ -1218,9 +1218,9 @@ const Login = () => {
               Or login with
             </span>
             <div style={{ flex: 1, height: "1px", backgroundColor: "rgba(255, 255, 255, 0.1)" }} />
-          </div>
+          </div> */}
 
-          <div style={{
+          {/* <div style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
             gap: "1rem"
@@ -1243,7 +1243,7 @@ const Login = () => {
               }}
             >
               Google
-            </button>
+            </button> */}
             {/* <button
               type="button"
               style={{
@@ -1263,7 +1263,7 @@ const Login = () => {
             >
               Apple
             </button> */}
-          </div>
+          {/* </div> */}
         </div>
       </div>
 
