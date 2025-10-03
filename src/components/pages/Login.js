@@ -502,7 +502,19 @@ const Login = () => {
           zIndex: 20,
           letterSpacing: "3px"
         }}>
-          <img src={michand} alt="Logo" style={{ width: "70px", height: "70px" }} />
+          <img 
+  src={michand} 
+  alt="Logo" 
+  style={{
+    width: "70px",
+    height: "70px",
+    borderRadius: "50%",      // makes it circular
+    backgroundColor: "#f4f4f4", // background color (change as needed)
+    padding: "10px",          // spacing inside circle
+    objectFit: "cover"        // keeps image ratio
+  }} 
+/>
+
         </div>
 
         {/* Back to website button */}
