@@ -959,12 +959,14 @@ const Login = () => {
               src={slide.image}
               alt={slide.author}
               style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                filter: slide.filter,
-                display: "block"
-              }}
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    objectPosition: "center 30%",  // ← ADD THIS LINE (adjust 30% to move image up/down)
+    filter: slide.filter,
+    display: "block",
+    margin: "2rem"  // ← ADD THIS LINE (creates space around image)
+  }}
             />
             {/* Dark overlay */}
             <div style={{
