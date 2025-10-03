@@ -921,7 +921,7 @@ const Login = () => {
 /> */}
         </div>
 
-        {/* Back to website button */}
+        {/* Back to website button
         <button 
           onClick={() => window.location.href = '/'}
           style={{
@@ -941,7 +941,7 @@ const Login = () => {
           }}
         >
           Back to website →
-        </button>
+        </button> */}
 
         {/* Image Slides */}
         {slides.map((slide, index) => (
@@ -1244,7 +1244,7 @@ const Login = () => {
             >
               Google
             </button>
-            <button
+            {/* <button
               type="button"
               style={{
                 padding: "1rem",
@@ -1262,7 +1262,7 @@ const Login = () => {
               }}
             >
               Apple
-            </button>
+            </button> */}
           </div>
         </div>
       </div>
