@@ -962,7 +962,7 @@ const Login = () => {
     width: "100%",
     height: "100%",
     objectFit: "cover",
-    objectPosition: "center 40%",  // ← ADD THIS LINE (adjust 30% to move image up/down)
+    objectPosition: "center 90%",  // ← ADD THIS LINE (adjust 30% to move image up/down)
     filter: slide.filter,
     display: "block",
     margin: "2rem"  // ← ADD THIS LINE (creates space around image)
