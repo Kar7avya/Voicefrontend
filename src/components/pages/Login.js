@@ -276,7 +276,7 @@ const Login = () => {
       image: shivaji,
       quote: "Freedom is a boon, which everyone has the right to receive.",
       author: "Chhatrapati Shivaji Maharaj",
-      filter: "grayscale(100%) contrast(1.2)"
+      filter: "contrast(1.2)"
     },
     {
       image: savarkar,
