@@ -258,6 +258,7 @@ import shivaji from '../pages/shivaji.jpg';
 import savarkar from '../pages/veersavarkar.jpg';
 import bose from '../pages/subhashchandrabose.jpg';
 import vivekananda from '../pages/swamivivekanand.jpg';
+import michand from '../pages/michand.png';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -501,7 +502,7 @@ const Login = () => {
           zIndex: 20,
           letterSpacing: "3px"
         }}>
-          AMLI
+          <img src={michand} alt="Logo" style={{ width: "100px", height: "auto" }} />
         </div>
 
         {/* Back to website button */}
