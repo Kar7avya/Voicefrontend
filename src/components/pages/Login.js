@@ -647,6 +647,7 @@ import savarkar from '../pages/veersavarkar.jpg';
 import bose from '../pages/subhashchandrabose.jpg';
 import vivekananda from '../pages/swamivivekanand.jpg';
 import michand from '../pages/michand.png';
+import aurobindo from '../pages/aurobindo.jpg';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -679,6 +680,12 @@ const Login = () => {
       author: "Chhatrapati Shivaji Maharaj",
       filter: "contrast(1.2)"
     },
+    {
+    image: aurobindo,
+    quote: "Sanatan Dharma, that is Nationalism. This Hindu nation was born with Sanatan Dharma, with it moves and with it grows.",
+    author: "Sri Aurobindo",
+    filter: "grayscale(100%) contrast(1.2)"
+  },
     {
       image: savarkar,
       quote: "Let us remember that the sole aim and objective is to secure the Hindu nation.",
