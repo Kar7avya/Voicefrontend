@@ -1,18 +1,10 @@
-// // import React, { useState, useRef, useEffect } from "react";
 // import React, { useState, useRef, useEffect, useCallback } from "react";
 // import { ToastContainer, toast } from "react-toastify";
 // import "react-toastify/dist/ReactToastify.css";
 // import { FaCloudUploadAlt, FaSpinner } from "react-icons/fa";
 // import styled, { keyframes } from 'styled-components';
 // import mic from "../pages/mic.png";
-// import { createClient } from "@supabase/supabase-js";
 // import backgroundSpotlight from "./spotlightsblack1.jpg";
-
-// // Supabase client initialization (API keys are needed even without auth)
-// // const supabase = createClient(
-// //   process.env.REACT_APP_SUPABASE_URL,
-// //   process.env.REACT_APP_SUPABASE_ANON_KEY
-// // );
 
 // // Keyframes for professional loader animation
 // const rotate = keyframes`
@@ -341,12 +333,6 @@
 //     console.log("Current User ID:", userId);
 //   }, [userId]);
 
-//   useEffect(() => {
-//     if (file) {
-//       handleUpload({ preventDefault: () => {} });
-//     }
-//   }, [file, handleUpload]);
-
 //   const handleFileSelect = (selectedFile) => {
 //     const maxSize = 500 * 1024 * 1024;
 //     const allowedTypes = [
@@ -398,7 +384,7 @@
 //     }
 //   };
 
-//   const handleUpload = async (e) => {
+//   const handleUpload = useCallback(async (e) => {
 //     e.preventDefault();
 
 //     if (!file) {
@@ -537,7 +523,13 @@
 //     } finally {
 //       setLoading(false);
 //     }
-//   };
+//   }, [file, userId, BACKEND_URL]);
+
+//   useEffect(() => {
+//     if (file) {
+//       handleUpload({ preventDefault: () => {} });
+//     }
+//   }, [file, handleUpload]);
 
 //   const handleManualTextAnalysis = async () => {
 //     if (!manualTranscript.trim()) {
@@ -704,7 +696,6 @@
 //     </MainWrapper>
 //   );
 // }
-
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ToastContainer, toast } from "react-toastify";
@@ -972,7 +963,7 @@ const ProgressBar = styled.div`
 
 const Progress = styled.div`
   height: 100%;
-  width: 75%; /* Simulating progress */
+  width: 75%;
   background: linear-gradient(90deg, #00A8FF, #00CFFF);
   border-radius: 4px;
   animation: pulse 1.5s infinite ease-in-out;
@@ -992,7 +983,8 @@ export default function Upload() {
   const fileInputRef = useRef(null);
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-  console.log("Backend URL from environment:", BACKEND_URL); 
+  console.log("🌐 Backend URL from environment:", BACKEND_URL); 
+
   // Generate unique user ID with sessionStorage persistence
   const [userId] = useState(() => {
     let existingId = null;
@@ -1002,17 +994,17 @@ export default function Upload() {
         existingId = sessionStorage.getItem('uniqueUserId');
         
         if (existingId && (!existingId.startsWith('user_') || existingId.length < 20)) {
-          console.warn('Invalid stored user ID format, generating new one');
+          console.warn('⚠️ Invalid stored user ID format, generating new one');
           existingId = null;
         }
       }
     } catch (error) {
-      console.warn('SessionStorage not available or error accessing it:', error.message);
+      console.warn('⚠️ SessionStorage not available or error accessing it:', error.message);
       existingId = null;
     }
     
     if (existingId) {
-      console.log('Using existing user ID:', existingId);
+      console.log('✅ Using existing user ID:', existingId);
       return existingId;
     }
     
@@ -1023,22 +1015,22 @@ export default function Upload() {
     try {
       if (typeof Storage !== "undefined" && window.sessionStorage) {
         sessionStorage.setItem('uniqueUserId', newId);
-        console.log('Stored new user ID in sessionStorage:', newId);
+        console.log('💾 Stored new user ID in sessionStorage:', newId);
       } else {
-        console.warn('SessionStorage not available - user ID will be session-only');
+        console.warn('⚠️ SessionStorage not available - user ID will be session-only');
       }
     } catch (error) {
-      console.warn('Could not store user ID in sessionStorage:', error.message);
+      console.warn('⚠️ Could not store user ID in sessionStorage:', error.message);
     }
     
-    console.log('Generated new user ID:', newId);
+    console.log('🆕 Generated new user ID:', newId);
     return newId;
   });
 
   const [manualTranscript, setManualTranscript] = useState("");
 
   useEffect(() => {
-    console.log("Current User ID:", userId);
+    console.log("👤 Current User ID:", userId);
   }, [userId]);
 
   const handleFileSelect = (selectedFile) => {
@@ -1062,6 +1054,12 @@ export default function Upload() {
       );
       return;
     }
+
+    console.log("✅ File selected:", {
+      name: selectedFile.name,
+      type: selectedFile.type,
+      size: (selectedFile.size / (1024 * 1024)).toFixed(2) + " MB"
+    });
 
     setFile(selectedFile);
   };
@@ -1108,29 +1106,41 @@ export default function Upload() {
     setPublicUrl("");
 
     try {
+      // STEP 1: Upload to Supabase
       toast.info("⬆️ Uploading file to Supabase...");
       
       const formData = new FormData();
-      formData.append("myvideo", file);
-      formData.append("user_id", userId);
+      formData.append("myvideo", file); // ✅ Matches backend middleware
+      formData.append("user_id", userId); // ✅ Matches backend controller
+
+      console.log("📤 Sending upload request...");
+      console.log("📦 File:", file.name, "Size:", (file.size / (1024 * 1024)).toFixed(2), "MB");
+      console.log("👤 User ID:", userId);
 
       const uploadRes = await fetch(`${BACKEND_URL}/api/upload`, {
         method: "POST",
         body: formData,
+        // Don't set Content-Type - browser sets it automatically with boundary
       });
+
+      console.log("📥 Upload response status:", uploadRes.status);
 
       if (!uploadRes.ok) {
         let errorText = "Unknown error";
         try {
           const errorJson = await uploadRes.json();
-          errorText = errorJson.error || JSON.stringify(errorJson);
+          errorText = errorJson.error || errorJson.details || JSON.stringify(errorJson);
+          console.error("❌ Upload error response:", errorJson);
         } catch {
           errorText = await uploadRes.text();
+          console.error("❌ Upload error text:", errorText);
         }
         throw new Error(`Upload failed (${uploadRes.status}): ${errorText}`);
       }
 
       const uploadData = await uploadRes.json();
+      console.log("✅ Upload response data:", uploadData);
+      
       const uploadedFilename = uploadData.videoName;
       const uploadPublicUrl = uploadData.publicUrl;
 
@@ -1142,97 +1152,141 @@ export default function Upload() {
       setPublicUrl(uploadPublicUrl);
       toast.success("✅ File uploaded to Supabase and metadata saved successfully!");
 
-      // Frame Extraction
-      toast.info("🖼️ Extracting frames (if video)...");
-      const extractForm = new FormData();
-      extractForm.append("videoName", uploadedFilename);
-      const extractRes = await fetch(`${BACKEND_URL}/api/extractFrames`, {
-        method: "POST",
-        body: extractForm,
-      });
-      if (!extractRes.ok) {
-        toast.warn("🖼️ Frame extraction skipped or failed (might be an audio file).");
-      } else {
-        toast.success("✅ Frames extracted (if video)!");
-      }
-
-      // Frame Analysis
-      toast.info("🤖 Analyzing frames with Gemini (if video)...");
-      const analyzeRes = await fetch(`${BACKEND_URL}/api/analyzeAllFrames`);
-      if (!analyzeRes.ok) {
-        toast.warn("🤖 Frame analysis skipped or failed (might be an audio file).");
-      } else {
-        const analyzeData = await analyzeRes.json();
-        const frames = Array.isArray(analyzeData) ? analyzeData : analyzeData.responses || [];
-        setResponses(frames.map((item) => `${item.file}: ${item.description}`));
-        toast.success("✅ Frame analysis complete (if video)!");
-      }
-
-      // ElevenLabs Transcription
-      toast.info("🗣️ Transcribing with ElevenLabs...");
-      const elevenForm = new FormData();
-      elevenForm.append("videoName", uploadedFilename);
-      const elevenRes = await fetch(`${BACKEND_URL}/api/transcribeWithElevenLabs`, {  
-        method: "POST",
-        body: elevenForm,
-      });
-      if (!elevenRes.ok) {
-        throw new Error(`ElevenLabs transcription failed: ${await elevenRes.text()}`);
-      }
-      const elevenData = await elevenRes.json();
-      setElevenLabsTranscript(elevenData.transcript || "No transcript from ElevenLabs");
-      toast.success("✅ ElevenLabs transcription done!");
-
-      // Deepgram Transcription
-      toast.info("🧠 Transcribing with Deepgram...");
-      const deepgramForm = new FormData();
-      deepgramForm.append("videoName", uploadedFilename);
-      const deepgramRes = await fetch(`${BACKEND_URL}/api/transcribeWithDeepgram`, { 
-        method: "POST",
-        body: deepgramForm,
-      });
-      if (!deepgramRes.ok) {
-        throw new Error(`Deepgram transcription failed: ${await deepgramRes.text()}`);
-      }
-      const deepgramData = await deepgramRes.json();
-      const deepgramTranscript = deepgramData.transcript || "No transcript from Deepgram";
-      setDeepgramTranscript(deepgramTranscript);
-      toast.success("✅ Deepgram transcription done!");
-
-      // LLM Analysis
-      if (deepgramTranscript && deepgramTranscript !== "No transcript from Deepgram") {
-        toast.info("✨ Analyzing speech with Gemini...");
+      // STEP 2: Frame Extraction (only for video files)
+      if (file.type.startsWith('video/')) {
+        toast.info("🖼️ Extracting frames from video...");
         try {
-          const analysisRes = await fetch(`${BACKEND_URL}/api/analyzeSpeechWithGemini`, {  
+          const extractForm = new FormData();
+          extractForm.append("videoName", uploadedFilename);
+          const extractRes = await fetch(`${BACKEND_URL}/api/extractFrames`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ transcript: deepgramTranscript, videoName: uploadedFilename }),
+            body: extractForm,
           });
-          if (!analysisRes.ok) {
-            let errorMessage = analysisRes.statusText;
-            try {
-              const errorData = await analysisRes.json();
-              errorMessage = errorData.error || errorMessage;
-            } catch (parseError) {}
-            throw new Error(`Gemini speech analysis failed: ${errorMessage}`);
+          
+          if (!extractRes.ok) {
+            console.warn("⚠️ Frame extraction failed:", await extractRes.text());
+            toast.warn("🖼️ Frame extraction skipped or failed.");
+          } else {
+            console.log("✅ Frames extracted successfully");
+            toast.success("✅ Frames extracted!");
+
+            // STEP 3: Frame Analysis
+            toast.info("🤖 Analyzing frames with Gemini...");
+            const analyzeRes = await fetch(`${BACKEND_URL}/api/analyzeAllFrames`);
+            
+            if (!analyzeRes.ok) {
+              console.warn("⚠️ Frame analysis failed:", await analyzeRes.text());
+              toast.warn("🤖 Frame analysis skipped or failed.");
+            } else {
+              const analyzeData = await analyzeRes.json();
+              const frames = Array.isArray(analyzeData) ? analyzeData : analyzeData.responses || [];
+              setResponses(frames.map((item) => `${item.file}: ${item.description}`));
+              console.log("✅ Frame analysis complete, found", frames.length, "frames");
+              toast.success("✅ Frame analysis complete!");
+            }
           }
-          const analysisData = await analysisRes.json();
-          setLlmAnalysisResult(analysisData.analysis);
-          toast.success("✅ Speech analysis by Gemini complete!");
-        } catch (analysisErr) {
-          toast.error("❌ Speech analysis failed. Check console for details.");
+        } catch (frameErr) {
+          console.error("❌ Frame processing error:", frameErr);
+          toast.warn("⚠️ Frame processing encountered an error.");
         }
       } else {
-        toast.info("ℹ️ No Deepgram transcript found for speech analysis.");
+        console.log("ℹ️ Audio file detected, skipping frame extraction");
+      }
+
+      // STEP 4: ElevenLabs Transcription
+      toast.info("🗣️ Transcribing with ElevenLabs...");
+      try {
+        const elevenForm = new FormData();
+        elevenForm.append("videoName", uploadedFilename);
+        const elevenRes = await fetch(`${BACKEND_URL}/api/transcribeWithElevenLabs`, {
+          method: "POST",
+          body: elevenForm,
+        });
+        
+        if (!elevenRes.ok) {
+          const elevenError = await elevenRes.text();
+          console.warn("⚠️ ElevenLabs failed:", elevenError);
+          toast.warn("⚠️ ElevenLabs transcription skipped.");
+        } else {
+          const elevenData = await elevenRes.json();
+          setElevenLabsTranscript(elevenData.transcript || "No transcript from ElevenLabs");
+          console.log("✅ ElevenLabs transcription complete");
+          toast.success("✅ ElevenLabs transcription done!");
+        }
+      } catch (elevenErr) {
+        console.error("❌ ElevenLabs error:", elevenErr);
+        toast.warn("⚠️ ElevenLabs transcription encountered an error.");
+      }
+
+      // STEP 5: Deepgram Transcription
+      toast.info("🧠 Transcribing with Deepgram...");
+      try {
+        const deepgramForm = new FormData();
+        deepgramForm.append("videoName", uploadedFilename);
+        const deepgramRes = await fetch(`${BACKEND_URL}/api/transcribeWithDeepgram`, {
+          method: "POST",
+          body: deepgramForm,
+        });
+        
+        if (!deepgramRes.ok) {
+          const deepgramError = await deepgramRes.text();
+          console.warn("⚠️ Deepgram failed:", deepgramError);
+          toast.warn("⚠️ Deepgram transcription skipped.");
+        } else {
+          const deepgramData = await deepgramRes.json();
+          const deepgramTranscript = deepgramData.transcript || "No transcript from Deepgram";
+          setDeepgramTranscript(deepgramTranscript);
+          console.log("✅ Deepgram transcription complete");
+          toast.success("✅ Deepgram transcription done!");
+
+          // STEP 6: LLM Analysis (only if we have a transcript)
+          if (deepgramTranscript && deepgramTranscript !== "No transcript from Deepgram") {
+            toast.info("✨ Analyzing speech with Gemini...");
+            try {
+              const analysisRes = await fetch(`${BACKEND_URL}/api/analyzeSpeechWithGemini`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                  transcript: deepgramTranscript, 
+                  videoName: uploadedFilename 
+                }),
+              });
+              
+              if (!analysisRes.ok) {
+                let errorMessage = analysisRes.statusText;
+                try {
+                  const errorData = await analysisRes.json();
+                  errorMessage = errorData.error || errorMessage;
+                } catch (parseError) {}
+                throw new Error(`Gemini speech analysis failed: ${errorMessage}`);
+              }
+              
+              const analysisData = await analysisRes.json();
+              setLlmAnalysisResult(analysisData.analysis);
+              console.log("✅ Speech analysis complete");
+              toast.success("✅ Speech analysis by Gemini complete!");
+            } catch (analysisErr) {
+              console.error("❌ Speech analysis error:", analysisErr);
+              toast.error("❌ Speech analysis failed. Check console for details.");
+            }
+          } else {
+            console.log("ℹ️ No valid transcript for analysis");
+          }
+        }
+      } catch (deepgramErr) {
+        console.error("❌ Deepgram error:", deepgramErr);
+        toast.warn("⚠️ Deepgram transcription encountered an error.");
       }
 
     } catch (err) {
+      console.error("💥 Upload process error:", err);
       toast.error(`❌ Operation failed: ${err.message || "An unknown error occurred."}`);
     } finally {
       setLoading(false);
     }
   }, [file, userId, BACKEND_URL]);
 
+  // Auto-upload when file is selected
   useEffect(() => {
     if (file) {
       handleUpload({ preventDefault: () => {} });
@@ -1250,7 +1304,7 @@ export default function Upload() {
 
     try {
       toast.info("✨ Analyzing text with Gemini...");
-      const analysisRes = await fetch(`${BACKEND_URL}/api/analyzeSpeechWithGemini`, {  
+      const analysisRes = await fetch(`${BACKEND_URL}/api/analyzeSpeechWithGemini`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transcript: manualTranscript }),
@@ -1269,6 +1323,7 @@ export default function Upload() {
       setLlmAnalysisResult(analysisData.analysis);
       toast.success("✅ Text analysis by Gemini complete!");
     } catch (error) {
+      console.error("❌ Text analysis error:", error);
       toast.error(`❌ Text analysis failed: ${error.message || "An unknown error occurred."}`);
     } finally {
       setLoading(false);
@@ -1390,7 +1445,7 @@ export default function Upload() {
                 </ResultSection>
               )}
               
-              {llmAnalysisResult && (
+              {llmAnalsisResult && (
                 <ResultSection>
                   <ResultTitle>AI Analysis:</ResultTitle>
                   <ResultText>{llmAnalysisResult}</ResultText>
