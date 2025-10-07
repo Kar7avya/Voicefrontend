@@ -1445,7 +1445,7 @@ export default function Upload() {
                 </ResultSection>
               )}
               
-              {llmAnalysisResult && (
+              {llmAnalsisResult && (
                 <ResultSection>
                   <ResultTitle>AI Analysis:</ResultTitle>
                   <ResultText>{llmAnalysisResult}</ResultText>
