@@ -8,6 +8,7 @@
 // import bose from '../pages/subhashchandrabose.jpg';
 // import vivekananda from '../pages/swamivivekanand.jpg';
 // import michand from '../pages/michand.png';
+// import aurobindo from '../pages/aurobindo.jpg';
 
 // const Login = () => {
 //   const navigate = useNavigate();
@@ -19,6 +20,19 @@
 //   const [showPassword, setShowPassword] = useState(false);
 //   const [currentSlide, setCurrentSlide] = useState(0);
 
+//   // Add this useEffect to remove body margins/padding
+//   useEffect(() => {
+//     document.body.style.margin = '0';
+//     document.body.style.padding = '0';
+//     document.body.style.overflow = 'hidden';
+//     document.documentElement.style.margin = '0';
+//     document.documentElement.style.padding = '0';
+    
+//     return () => {
+//       document.body.style.overflow = 'auto';
+//     };
+//   }, []);
+
 //   // Hero images with quotes
 //   const slides = [
 //     {
@@ -27,6 +41,12 @@
 //       author: "Chhatrapati Shivaji Maharaj",
 //       filter: "contrast(1.2)"
 //     },
+//     {
+//     image: aurobindo,
+//     quote: "Sanatan Dharma, that is Nationalism. This Hindu nation was born with Sanatan Dharma, with it moves and with it grows.",
+//     author: "Sri Aurobindo",
+//     filter: "grayscale(100%) contrast(1.2)"
+//   },
 //     {
 //       image: savarkar,
 //       quote: "Let us remember that the sole aim and objective is to secure the Hindu nation.",
@@ -139,15 +159,6 @@
 //       if (data.session && data.user) {
 //         console.log("✅ Login successful:", data.user.email);
         
-//         localStorage.setItem("access_token", data.session.access_token);
-//         localStorage.setItem("refresh_token", data.session.refresh_token);
-//         localStorage.setItem("user_id", data.session.user.id);
-//         localStorage.setItem("user_email", data.session.user.email);
-        
-//         if (data.session.user.user_metadata) {
-//           localStorage.setItem("user_metadata", JSON.stringify(data.session.user.user_metadata));
-//         }
-
 //         const userName = data.session.user.user_metadata?.full_name || 
 //                         data.session.user.email.split("@")[0] || 
 //                         "User";
@@ -198,11 +209,17 @@
 //   if (!supabaseReady) {
 //     return (
 //       <div style={{ 
-//         minHeight: "100vh", 
+//         position: "fixed",
+//         top: 0,
+//         left: 0,
+//         right: 0,
+//         bottom: 0,
 //         display: "flex", 
 //         alignItems: "center", 
 //         justifyContent: "center",
-//         backgroundColor: "#0f0f0f"
+//         backgroundColor: "#0f0f0f",
+//         margin: 0,
+//         padding: 0
 //       }}>
 //         <div style={{ textAlign: "center", color: "white" }}>
 //           <div style={{ 
@@ -228,10 +245,17 @@
 
 //   return (
 //     <div style={{
+//       position: "fixed",
+//       top: 0,
+//       left: 0,
+//       right: 0,
+//       bottom: 0,
 //       display: "flex",
-//       minHeight: "100vh",
 //       backgroundColor: "#0f0f0f",
-//       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+//       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+//       margin: 0,
+//       padding: 0,
+//       overflow: "hidden"
 //     }}>
 //       {/* Left Side - Image Slider with Quotes */}
 //       <div style={{
@@ -257,16 +281,15 @@
 //   style={{
 //     width: "70px",
 //     height: "70px",
-//     borderRadius: "50%",      // makes it circular
-//     backgroundColor: "#f4f4f4", // background color (change as needed)
-//     padding: "10px",          // spacing inside circle
-//     objectFit: "cover"        // keeps image ratio
+//     borderRadius: "50%",
+//     backgroundColor: "#f4f4f4",
+//     padding: "10px",
+//     objectFit: "cover"
 //   }} 
 // /> */}
-
 //         </div>
 
-//         {/* Back to website button */}
+//         {/* Back to website button
 //         <button 
 //           onClick={() => window.location.href = '/'}
 //           style={{
@@ -286,7 +309,7 @@
 //           }}
 //         >
 //           Back to website →
-//         </button>
+//         </button> */}
 
 //         {/* Image Slides */}
 //         {slides.map((slide, index) => (
@@ -304,11 +327,14 @@
 //               src={slide.image}
 //               alt={slide.author}
 //               style={{
-//                 width: "100%",
-//                 height: "100%",
-//                 objectFit: "cover",
-//                 filter: slide.filter
-//               }}
+//     width: "100%",
+//     height: "100%",
+//     objectFit: "cover",
+//     objectPosition: "center 10%",  // ← ADD THIS LINE (adjust 30% to move image up/down)
+//     filter: slide.filter,
+//     display: "block",
+//     margin: "2rem"  // ← ADD THIS LINE (creates space around image)
+//   }}
 //             />
 //             {/* Dark overlay */}
 //             <div style={{
@@ -386,7 +412,8 @@
 //         alignItems: "center",
 //         justifyContent: "center",
 //         padding: "2rem",
-//         backgroundColor: "#1a1a1a"
+//         backgroundColor: "#1a1a1a",
+//         overflowY: "auto"
 //       }}>
 //         <div style={{
 //           width: "100%",
@@ -550,7 +577,7 @@
 //             )}
 //           </button>
 
-//           <div style={{
+//           {/* <div style={{
 //             display: "flex",
 //             alignItems: "center",
 //             gap: "1rem",
@@ -561,9 +588,9 @@
 //               Or login with
 //             </span>
 //             <div style={{ flex: 1, height: "1px", backgroundColor: "rgba(255, 255, 255, 0.1)" }} />
-//           </div>
+//           </div> */}
 
-//           <div style={{
+//           {/* <div style={{
 //             display: "grid",
 //             gridTemplateColumns: "1fr 1fr",
 //             gap: "1rem"
@@ -586,8 +613,8 @@
 //               }}
 //             >
 //               Google
-//             </button>
-//             <button
+//             </button> */}
+//             {/* <button
 //               type="button"
 //               style={{
 //                 padding: "1rem",
@@ -605,12 +632,24 @@
 //               }}
 //             >
 //               Apple
-//             </button>
-//           </div>
+//             </button> */}
+//           {/* </div> */}
 //         </div>
 //       </div>
 
 //       <style>{`
+//         * {
+//           margin: 0;
+//           padding: 0;
+//           box-sizing: border-box;
+//         }
+        
+//         body, html, #root {
+//           margin: 0 !important;
+//           padding: 0 !important;
+//           overflow: hidden;
+//         }
+        
 //         @keyframes fadeInUp {
 //           from { 
 //             opacity: 0; 
@@ -620,6 +659,11 @@
 //             opacity: 1; 
 //             transform: translateX(-50%) translateY(0); 
 //           }
+//         }
+        
+//         @keyframes spin {
+//           0% { transform: rotate(0deg); }
+//           100% { transform: rotate(360deg); }
 //         }
         
 //         input::placeholder {
@@ -637,17 +681,12 @@
 
 // export default Login;
 
+
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Eye, EyeOff } from "lucide-react";
 import supabase from "./supabaseClient";
-import shivaji from '../pages/shivaji.jpg';
-import savarkar from '../pages/veersavarkar.jpg';
-import bose from '../pages/subhashchandrabose.jpg';
-import vivekananda from '../pages/swamivivekanand.jpg';
-import michand from '../pages/michand.png';
-import aurobindo from '../pages/aurobindo.jpg';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -659,54 +698,33 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  // Add this useEffect to remove body margins/padding
-  useEffect(() => {
-    document.body.style.margin = '0';
-    document.body.style.padding = '0';
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.margin = '0';
-    document.documentElement.style.padding = '0';
-    
-    return () => {
-      document.body.style.overflow = 'auto';
-    };
-  }, []);
-
-  // Hero images with quotes
   const slides = [
     {
-      image: shivaji,
+      image: "https://images.unsplash.com/photo-1604610525665-6973305ff0b4?w=800&h=1200&fit=crop&q=80",
       quote: "Freedom is a boon, which everyone has the right to receive.",
       author: "Chhatrapati Shivaji Maharaj",
       filter: "contrast(1.2)"
     },
     {
-    image: aurobindo,
-    quote: "Sanatan Dharma, that is Nationalism. This Hindu nation was born with Sanatan Dharma, with it moves and with it grows.",
-    author: "Sri Aurobindo",
-    filter: "grayscale(100%) contrast(1.2)"
-  },
-    {
-      image: savarkar,
-      quote: "Let us remember that the sole aim and objective is to secure the Hindu nation.",
-      author: "Veer Savarkar",
+      image: "https://images.unsplash.com/photo-1618556947959-ec9d4c1d8bf3?w=800&h=1200&fit=crop&q=80",
+      quote: "Sanatan Dharma, that is Nationalism.",
+      author: "Sri Aurobindo",
       filter: "grayscale(100%) contrast(1.2)"
     },
     {
-      image: bose,
+      image: "https://images.unsplash.com/photo-1583324113626-70df0f4deaab?w=800&h=1200&fit=crop&q=80",
       quote: "Give me blood, and I shall give you freedom.",
       author: "Subhash Chandra Bose",
       filter: "grayscale(100%) contrast(1.2)"
     },
     {
-      image: vivekananda,
+      image: "https://images.unsplash.com/photo-1604610525665-6973305ff0b4?w=800&h=1200&fit=crop&q=80",
       quote: "Arise, awake and stop not till the goal is reached.",
       author: "Swami Vivekananda",
       filter: "grayscale(100%) contrast(1.2)"
     }
   ];
 
-  // Auto-slide functionality
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
@@ -714,7 +732,6 @@ const Login = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Check if user is already logged in
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -787,8 +804,6 @@ const Login = () => {
           toast.error("Invalid email or password. Please check your credentials.");
         } else if (error.message.includes("Too many requests")) {
           toast.error("Too many login attempts. Please try again later.");
-        } else if (error.message.includes("Email address not confirmed")) {
-          toast.error("Please verify your email address before logging in.");
         } else {
           toast.error(error.message || "Login failed. Please try again.");
         }
@@ -798,8 +813,8 @@ const Login = () => {
       if (data.session && data.user) {
         console.log("✅ Login successful:", data.user.email);
         
-        const userName = data.session.user.user_metadata?.full_name || 
-                        data.session.user.email.split("@")[0] || 
+        const userName = data.user.user_metadata?.full_name || 
+                        data.user.email.split("@")[0] || 
                         "User";
         
         toast.success(`Welcome back, ${userName}!`);
@@ -814,8 +829,6 @@ const Login = () => {
       
       if (err.message.includes("fetch")) {
         toast.error("Network error. Please check your connection and try again.");
-      } else if (err.message.includes("Failed to fetch")) {
-        toast.error("Unable to connect to authentication service. Please try again.");
       } else {
         toast.error("Something went wrong. Please try again.");
       }
@@ -856,9 +869,7 @@ const Login = () => {
         display: "flex", 
         alignItems: "center", 
         justifyContent: "center",
-        backgroundColor: "#0f0f0f",
-        margin: 0,
-        padding: 0
+        backgroundColor: "#0f0f0f"
       }}>
         <div style={{ textAlign: "center", color: "white" }}>
           <div style={{ 
@@ -892,18 +903,15 @@ const Login = () => {
       display: "flex",
       backgroundColor: "#0f0f0f",
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      margin: 0,
-      padding: 0,
       overflow: "hidden"
     }}>
-      {/* Left Side - Image Slider with Quotes */}
+      {/* Left Side - Image Slider */}
       <div style={{
         flex: 1,
         position: "relative",
         overflow: "hidden",
         backgroundColor: "#000"
       }}>
-        {/* Logo */}
         <div style={{
           position: "absolute",
           top: "2rem",
@@ -914,43 +922,9 @@ const Login = () => {
           zIndex: 20,
           letterSpacing: "3px"
         }}>
-          {/* <img 
-  src={michand} 
-  alt="Logo" 
-  style={{
-    width: "70px",
-    height: "70px",
-    borderRadius: "50%",
-    backgroundColor: "#f4f4f4",
-    padding: "10px",
-    objectFit: "cover"
-  }} 
-/> */}
+          AMLI
         </div>
 
-        {/* Back to website button
-        <button 
-          onClick={() => window.location.href = '/'}
-          style={{
-            position: "absolute",
-            top: "2rem",
-            right: "2rem",
-            background: "rgba(255, 255, 255, 0.1)",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(255, 255, 255, 0.2)",
-            color: "white",
-            padding: "0.75rem 1.5rem",
-            borderRadius: "8px",
-            cursor: "pointer",
-            fontSize: "0.95rem",
-            zIndex: 20,
-            transition: "all 0.3s"
-          }}
-        >
-          Back to website →
-        </button> */}
-
-        {/* Image Slides */}
         {slides.map((slide, index) => (
           <div
             key={index}
@@ -958,24 +932,19 @@ const Login = () => {
               position: "absolute",
               inset: 0,
               opacity: currentSlide === index ? 1 : 0,
-              transition: "opacity 1.5s ease-in-out",
-              pointerEvents: currentSlide === index ? "auto" : "none"
+              transition: "opacity 1.5s ease-in-out"
             }}
           >
             <img 
               src={slide.image}
               alt={slide.author}
               style={{
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    objectPosition: "center 10%",  // ← ADD THIS LINE (adjust 30% to move image up/down)
-    filter: slide.filter,
-    display: "block",
-    margin: "2rem"  // ← ADD THIS LINE (creates space around image)
-  }}
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                filter: slide.filter
+              }}
             />
-            {/* Dark overlay */}
             <div style={{
               position: "absolute",
               inset: 0,
@@ -984,7 +953,6 @@ const Login = () => {
           </div>
         ))}
 
-        {/* Quote Section */}
         <div style={{
           position: "absolute",
           bottom: "4rem",
@@ -994,8 +962,7 @@ const Login = () => {
           color: "white",
           maxWidth: "700px",
           padding: "0 2rem",
-          zIndex: 10,
-          animation: currentSlide >= 0 ? "fadeInUp 1s ease-out" : "none"
+          zIndex: 10
         }}>
           <h2 style={{
             fontSize: "2.2rem",
@@ -1017,7 +984,6 @@ const Login = () => {
           </p>
         </div>
 
-        {/* Slide Indicators */}
         <div style={{
           position: "absolute",
           bottom: "2rem",
@@ -1090,189 +1056,114 @@ const Login = () => {
             </button>
           </p>
 
-          <div style={{ marginBottom: "1.25rem" }}>
-            <input
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: "1.25rem" }}>
+              <input
+                style={{ 
+                  width: "100%", 
+                  padding: "1rem", 
+                  fontSize: "1rem",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  borderRadius: "8px",
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  color: "white",
+                  boxSizing: "border-box",
+                  outline: "none",
+                  transition: "all 0.3s"
+                }}
+                placeholder="Email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                autoComplete="email"
+                disabled={loading}
+              />
+            </div>
+            
+            <div style={{ marginBottom: "1rem", position: "relative" }}>
+              <input
+                style={{ 
+                  width: "100%", 
+                  padding: "1rem",
+                  paddingRight: "3rem",
+                  fontSize: "1rem",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  borderRadius: "8px",
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  color: "white",
+                  boxSizing: "border-box",
+                  outline: "none",
+                  transition: "all 0.3s"
+                }}
+                placeholder="Password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                value={formData.password}
+                onChange={handleChange}
+                required
+                autoComplete="current-password"
+                disabled={loading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: "absolute",
+                  right: "1rem",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  color: "rgba(255, 255, 255, 0.5)",
+                  cursor: "pointer",
+                  padding: "0.5rem",
+                  display: "flex",
+                  alignItems: "center"
+                }}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+
+            <div style={{ textAlign: "right", marginBottom: "1.5rem" }}>
+              <button 
+                type="button"
+                onClick={handleForgotPassword}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "rgba(255, 255, 255, 0.6)",
+                  textDecoration: "underline",
+                  cursor: "pointer",
+                  fontSize: "0.9rem"
+                }}
+                disabled={loading}
+              >
+                Forgot Password?
+              </button>
+            </div>
+            
+            <button 
+              type="submit"
+              disabled={loading}
               style={{ 
                 width: "100%", 
                 padding: "1rem", 
                 fontSize: "1rem",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                borderRadius: "8px",
-                backgroundColor: "rgba(255, 255, 255, 0.05)",
-                color: "white",
-                boxSizing: "border-box",
-                outline: "none",
-                transition: "all 0.3s"
-              }}
-              placeholder="Email"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              autoComplete="email"
-              disabled={loading}
-              onFocus={(e) => e.target.style.borderColor = "rgba(255, 255, 255, 0.3)"}
-              onBlur={(e) => e.target.style.borderColor = "rgba(255, 255, 255, 0.1)"}
-            />
-          </div>
-          
-          <div style={{ marginBottom: "1rem", position: "relative" }}>
-            <input
-              style={{ 
-                width: "100%", 
-                padding: "1rem",
-                paddingRight: "3rem",
-                fontSize: "1rem",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                borderRadius: "8px",
-                backgroundColor: "rgba(255, 255, 255, 0.05)",
-                color: "white",
-                boxSizing: "border-box",
-                outline: "none",
-                transition: "all 0.3s"
-              }}
-              placeholder="Password"
-              name="password"
-              type={showPassword ? "text" : "password"}
-              value={formData.password}
-              onChange={handleChange}
-              required
-              autoComplete="current-password"
-              disabled={loading}
-              onFocus={(e) => e.target.style.borderColor = "rgba(255, 255, 255, 0.3)"}
-              onBlur={(e) => e.target.style.borderColor = "rgba(255, 255, 255, 0.1)"}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              style={{
-                position: "absolute",
-                right: "1rem",
-                top: "50%",
-                transform: "translateY(-50%)",
-                background: "none",
+                fontWeight: "500",
+                backgroundColor: loading ? "#333" : "#fff",
+                color: loading ? "#666" : "#000",
                 border: "none",
-                color: "rgba(255, 255, 255, 0.5)",
-                cursor: "pointer",
-                padding: "0.5rem",
-                display: "flex",
-                alignItems: "center"
-              }}
-            >
-              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-            </button>
-          </div>
-
-          <div style={{ textAlign: "right", marginBottom: "1.5rem" }}>
-            <button 
-              onClick={handleForgotPassword}
-              style={{
-                background: "none",
-                border: "none",
-                color: "rgba(255, 255, 255, 0.6)",
-                textDecoration: "underline",
-                cursor: "pointer",
-                fontSize: "0.9rem"
-              }}
-              disabled={loading}
-            >
-              Forgot Password?
-            </button>
-          </div>
-          
-          <button 
-            onClick={handleSubmit}
-            disabled={loading}
-            style={{ 
-              width: "100%", 
-              padding: "1rem", 
-              fontSize: "1rem",
-              fontWeight: "500",
-              backgroundColor: loading ? "#333" : "#fff",
-              color: loading ? "#666" : "#000",
-              border: "none",
-              borderRadius: "8px",
-              cursor: loading ? "not-allowed" : "pointer",
-              transition: "all 0.3s",
-              marginBottom: "2rem"
-            }}
-          >
-            {loading ? (
-              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}>
-                <span style={{ 
-                  display: "inline-block",
-                  width: "16px",
-                  height: "16px",
-                  border: "2px solid transparent",
-                  borderTop: "2px solid #666",
-                  borderRadius: "50%",
-                  animation: "spin 1s linear infinite"
-                }}></span>
-                Logging in...
-              </span>
-            ) : (
-              "Login"
-            )}
-          </button>
-
-          {/* <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "1rem",
-            marginBottom: "1.5rem"
-          }}>
-            <div style={{ flex: 1, height: "1px", backgroundColor: "rgba(255, 255, 255, 0.1)" }} />
-            <span style={{ color: "rgba(255, 255, 255, 0.4)", fontSize: "0.9rem" }}>
-              Or login with
-            </span>
-            <div style={{ flex: 1, height: "1px", backgroundColor: "rgba(255, 255, 255, 0.1)" }} />
-          </div> */}
-
-          {/* <div style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "1rem"
-          }}>
-            <button
-              type="button"
-              style={{
-                padding: "1rem",
                 borderRadius: "8px",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                backgroundColor: "rgba(255, 255, 255, 0.05)",
-                color: "white",
-                fontSize: "1rem",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.5rem",
+                cursor: loading ? "not-allowed" : "pointer",
                 transition: "all 0.3s"
               }}
             >
-              Google
-            </button> */}
-            {/* <button
-              type="button"
-              style={{
-                padding: "1rem",
-                borderRadius: "8px",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                backgroundColor: "rgba(255, 255, 255, 0.05)",
-                color: "white",
-                fontSize: "1rem",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.5rem",
-                transition: "all 0.3s"
-              }}
-            >
-              Apple
-            </button> */}
-          {/* </div> */}
+              {loading ? "Logging in..." : "Login"}
+            </button>
+          </form>
         </div>
       </div>
 
@@ -1281,23 +1172,6 @@ const Login = () => {
           margin: 0;
           padding: 0;
           box-sizing: border-box;
-        }
-        
-        body, html, #root {
-          margin: 0 !important;
-          padding: 0 !important;
-          overflow: hidden;
-        }
-        
-        @keyframes fadeInUp {
-          from { 
-            opacity: 0; 
-            transform: translateX(-50%) translateY(30px); 
-          }
-          to { 
-            opacity: 1; 
-            transform: translateX(-50%) translateY(0); 
-          }
         }
         
         @keyframes spin {
@@ -1310,7 +1184,6 @@ const Login = () => {
         }
         
         button:hover:not(:disabled) {
-          transform: translateY(-1px);
           opacity: 0.9;
         }
       `}</style>
