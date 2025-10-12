@@ -772,8 +772,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css"; // Note: CSS import relies on global availability
 import { useNavigate } from "react-router-dom";
-// Using inline SVG for icons since external libraries are restricted
-// Using placeholders for background images
+// Assuming supabaseClient is available via the relative path
 import supabase, { getCurrentUser, getAuthHeaders } from './supabaseClient'; 
 import styled, { keyframes } from 'styled-components';
 
@@ -789,7 +788,7 @@ const pulse = keyframes`
   100% { transform: scale(1); opacity: 0.8; }
 `;
 
-// Generic background color used instead of external image
+// Generic colors used instead of external images/libraries
 const BACKGROUND_COLOR = '#111827'; 
 const PRIMARY_COLOR = '#00A8FF';
 
@@ -799,7 +798,7 @@ const MainWrapper = styled.div`
   position: relative;
   font-family: 'Inter', sans-serif;
   color: #E0E0E0;
-  padding-top: 3.9rem; /* Adjusted for fixed positioning */
+  padding-top: 3.9rem; 
 `;
 const SectionContainer = styled.section`
   position: relative;
@@ -855,10 +854,11 @@ const UploadArea = styled.div`
     background-color: rgba(0, 168, 255, 0.08);
   }
 `;
+// Replacement for FaCloudUploadAlt
 const UploadIcon = ({ size = '5rem', color = PRIMARY_COLOR }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', margin: '0 auto 1rem' }}>
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-    </svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', margin: '0 auto 1rem' }}>
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+    </svg>
 );
 
 const UploadText = styled.h4`
@@ -972,11 +972,11 @@ const LoadingContainer = styled.div`
   min-height: 100vh;
   text-align: center;
 `;
-// Using inline SVG for Spinner
+// Replacement for FaSpinner
 const SpinnerSVG = ({ size = '3rem', color = PRIMARY_COLOR }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill={color} style={{ animation: `${rotate} 1.5s linear infinite`, margin: '0 auto 1.5rem' }}>
-        <path d="M12 2a10 10 0 0 1 10 10c0 1.25-.26 2.45-.73 3.55L19 14.8c-.37-.84-.5-1.78-.4-2.73a8 8 0 0 0-8-8 8 8 0 0 0-8 8 8 8 0 0 0 8 8c.95.1 1.89-.03 2.73-.4L15.55 21.27C14.45 21.74 13.25 22 12 22A10 10 0 0 1 12 2z"/>
-    </svg>
+    <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill={color} style={{ animation: `${rotate} 1.5s linear infinite`, margin: '0 auto 1.5rem' }}>
+        <path d="M12 2a10 10 0 0 1 10 10c0 1.25-.26 2.45-.73 3.55L19 14.8c-.37-.84-.5-1.78-.4-2.73a8 8 0 0 0-8-8 8 8 0 0 0-8 8 8 8 0 0 0 8 8c.95.1 1.89-.03 2.73-.4L15.55 21.27C14.45 21.74 13.25 22 12 22A10 10 0 0 1 12 2z"/>
+    </svg>
 );
 
 const LoadingText = styled.h5`
