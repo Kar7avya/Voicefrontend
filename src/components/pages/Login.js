@@ -1198,8 +1198,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Eye, EyeOff } from "lucide-react";
-// FIX: Using the correct relative path based on file hierarchy
-import supabase from "../components/supabaseClient"; 
+// FINAL FIX: Assuming supabaseClient is located in the same directory as Login.jsx
+import supabase from "./supabaseClient"; 
 
 const Login = () => {
   const navigate = useNavigate();
@@ -1325,8 +1325,6 @@ const Login = () => {
 
       if (data.session && data.user) {
         console.log("✅ Login successful:", data.user.email);
-        // The successful login triggers the storage of the new JWT internally in the client,
-        // which will be retrieved by getAuthHeaders() later.
         
         const userName = data.user.user_metadata?.full_name || 
                         data.user.email.split("@")[0] || 
@@ -1595,7 +1593,7 @@ const Login = () => {
                 autoComplete="email"
                 disabled={loading}
               />
-            </div>
+              </div>
             
             <div style={{ marginBottom: "1rem", position: "relative" }}>
               <input
@@ -1640,7 +1638,7 @@ const Login = () => {
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
-            </div>
+              </div>
 
             <div style={{ textAlign: "right", marginBottom: "1.5rem" }}>
               <button 
