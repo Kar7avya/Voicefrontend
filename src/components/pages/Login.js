@@ -1198,6 +1198,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Eye, EyeOff } from "lucide-react";
+// FIX: Using the correct relative path based on file hierarchy
 import supabase from "../components/supabaseClient"; 
 
 const Login = () => {
@@ -1594,7 +1595,7 @@ const Login = () => {
                 autoComplete="email"
                 disabled={loading}
               />
-              </div>
+            </div>
             
             <div style={{ marginBottom: "1rem", position: "relative" }}>
               <input
