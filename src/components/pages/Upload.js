@@ -770,14 +770,14 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css"; // Note: CSS import relies on global availability
+import "react-toastify/dist/ReactToastify.css"; 
 import { useNavigate } from "react-router-dom";
-// Assuming supabaseClient is available via the relative path
+// Assuming supabaseClient is in the same directory (src/components/supabaseClient.js)
 import supabase, { getCurrentUser, getAuthHeaders } from './supabaseClient'; 
 import styled, { keyframes } from 'styled-components';
 
 
-// --- Styled Components (Minimal changes to resolve external library issues) ---
+// --- Styled Components (Using standard practices) ---
 const rotate = keyframes`
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -1351,12 +1351,9 @@ export default function Upload() {
                   "Content-Type": "application/json",
                   ...authHeaders
                 },
-                body: JSON.stringify({ 
-                  transcript: deepgramTranscript, 
-                  videoName: uploadedFilename 
-                }),
+                body: JSON.stringify({ transcript: manualTranscript }),
               });
-              
+
               if (!analysisRes.ok) {
                 let errorMessage = analysisRes.statusText;
                 try {
@@ -1368,11 +1365,10 @@ export default function Upload() {
                 // Specific error message for 404
                 throw new Error(`Gemini speech analysis failed: ${errorMessage}. Check backend route/logs (404).`);
               }
-              
+
               const analysisData = await analysisRes.json();
               setLlmAnalysisResult(analysisData.analysis);
-              console.log("✅ Speech analysis complete");
-              toast.success("✅ Speech analysis by Gemini complete!");
+              toast.success("✅ Text analysis by Gemini complete!");
             } catch (analysisErr) {
               console.error("❌ Speech analysis error:", analysisErr);
               toast.error("❌ Speech analysis failed. Check console for details and backend route (404).");
