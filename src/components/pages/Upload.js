@@ -772,7 +772,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css"; 
 import { useNavigate } from "react-router-dom";
-// Assuming supabaseClient is in the same directory (src/components/supabaseClient.js)
+// Assuming supabaseClient is available via the relative path
 import supabase, { getCurrentUser, getAuthHeaders } from './supabaseClient'; 
 import styled, { keyframes } from 'styled-components';
 
@@ -986,6 +986,7 @@ const LoadingText = styled.h5`
   margin-bottom: 1rem;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
 `;
 const ProgressBar = styled.div`
@@ -1359,9 +1360,7 @@ export default function Upload() {
                 try {
                   const errorData = await analysisRes.json();
                   errorMessage = errorData.error || errorMessage;
-                } catch (parseError) {
-                  console.error("Failed to parse error response");
-                }
+                } catch (parseError) {}
                 // Specific error message for 404
                 throw new Error(`Gemini speech analysis failed: ${errorMessage}. Check backend route/logs (404).`);
               }
@@ -1438,9 +1437,7 @@ export default function Upload() {
         try {
           const errorData = await analysisRes.json();
           errorMessage = errorData.error || errorMessage;
-        } catch (parseError) {
-          console.error("Failed to parse error response");
-        }
+        } catch (parseError) {}
         throw new Error(`Gemini text analysis failed: ${errorMessage}`);
       }
 
@@ -1483,7 +1480,7 @@ export default function Upload() {
             <div style={{ width: "40px", height: "40px", backgroundColor: "white", borderRadius: "50%", display: "inline-block" }}></div>
             Processing your presentation...
           </LoadingText>
-          <p className="text-gray-400 mb-4 text-center">
+          <p style={{ color: "#9CA3AF", marginBottom: "1rem", textAlign: "center" }}>
             Analyzing your video/audio, transcribing, and generating insights...
           </p>
           <ProgressBar>
@@ -1649,7 +1646,6 @@ export default function Upload() {
         rtl={false}
         pauseOnFocusLoss
         draggable
-        pauseOnHover
         theme="dark"
       />
     </MainWrapper>
