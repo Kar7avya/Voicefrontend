@@ -1,8 +1,8 @@
-// dashboard.js
+// dashboard.js - FIXED & ROBUST AUTH CHECK
 
 import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
-// 👈 Import both auth utilities from the provided file
+// 👈 Import both auth utilities (assuming they are in './supabaseClient')
 import { getAuthHeaders, getCurrentUser } from './supabaseClient'; 
 
 const fadeIn = keyframes`
@@ -310,13 +310,14 @@ function Dashboard() {
   const [metadataList, setMetadataList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  // 💡 NEW STATE: Track user and auth status
+  
+  // 💡 STATE FOR AUTH CHECKING
   const [user, setUser] = useState(null); 
   const [authChecked, setAuthChecked] = useState(false); 
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://voicebackend-20.onrender.com';
 
-  // 1. Check Authentication on Mount
+  // 1. Check Authentication on Mount (Independent of fetching)
   useEffect(() => {
     const checkAuth = async () => {
         try {
@@ -331,12 +332,12 @@ function Dashboard() {
     checkAuth();
   }, []);
 
-  // 2. Fetch Metadata only when auth is confirmed
+  // 2. Fetch Metadata only when auth is confirmed and user is present
   useEffect(() => {
     if (!authChecked) return;
 
     if (!user) {
-        // User not logged in: display the login error immediately
+        // User not logged in: display the login error and stop loading
         setError("Authentication required. Please log in to view your dashboard.");
         setIsLoading(false);
         return; 
@@ -347,13 +348,12 @@ function Dashboard() {
         setIsLoading(true);
         setError(null);
         
-        // 🔑 Fetch auth headers. This might throw if the session is bad.
-        let authHeaders;
-        try {
-            authHeaders = await getAuthHeaders();
-        } catch (authError) {
-             // Catch error from getAuthHeaders explicitly
-             throw new Error("Authentication failed. Please try logging in again.");
+        // Use getAuthHeaders (it's assumed to return object or null, not throw)
+        const authHeaders = await getAuthHeaders();
+        
+        if (!authHeaders) {
+             // Safety check for session invalidation even if user object exists
+             throw new Error("Session is invalid. Please log in again.");
         }
         
         const response = await fetch(`${BACKEND_URL}/api/metadata`, {
@@ -361,10 +361,14 @@ function Dashboard() {
           headers: { 
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            // 🔑 Inject the Authorization header
             ...authHeaders 
           }
         });
+        
+        // 🛑 Explicitly handle 401 Unauthorized error from the backend 🛑
+        if (response.status === 401) {
+             throw new Error("Your session expired or your token is invalid. Please log in again.");
+        }
 
         if (!response.ok) {
           let errorMessage = `HTTP ${response.status}`;
@@ -372,13 +376,8 @@ function Dashboard() {
             const errorData = await response.json();
             errorMessage = errorData.error || errorData.message || errorMessage;
           } catch {
-            const errorText = await response.text();
-            errorMessage = errorText || errorMessage;
+            errorMessage = await response.text() || errorMessage;
           }
-
-          if (response.status === 401 || response.status === 403) {
-             errorMessage = "Access Denied by Server (RLS failure). Ensure you are logged in and refresh.";
-          }
           throw new Error(errorMessage);
         }
 
@@ -402,7 +401,88 @@ function Dashboard() {
     };
 
     fetchMetadata();
-  }, [BACKEND_URL, authChecked, user]); // Dependency array updated
+  }, [BACKEND_URL, authChecked, user]); // Auth state is the key dependency
+
+  const analyzePerformance = (item) => {
+    let fillerWordsCount = 0;
+    let pausesCount = 0;
+    let wordsArray = [];
+
+    // Extract words from deepgram data
+    if (item.deepgram_words) {
+      if (Array.isArray(item.deepgram_words)) {
+        wordsArray = item.deepgram_words;
+      } else if (typeof item.deepgram_words === 'object' && item.deepgram_words.words) {
+        wordsArray = item.deepgram_words.words;
+      }
+    }
+
+    // Count filler words
+    if (wordsArray.length > 0) {
+      const fillerWords = ['uh', 'um', 'like', 'you know', 'so', 'and', 'but', 'well', 'actually', 'basically'];
+      fillerWordsCount = wordsArray.filter(word =>
+        fillerWords.includes(word.word?.toLowerCase())
+      ).length;
+    }
+
+    // Count pauses
+    if (item.deepgram_transcript) {
+      const pauses = item.deepgram_transcript.match(/\[PAUSE:.*?\]/g);
+      if (pauses) pausesCount = pauses.length;
+    }
+
+    const totalWords = wordsArray.length;
+    const fluencyScore = totalWords > 0
+      ? ((totalWords - fillerWordsCount) / totalWords) * 100
+      : 100;
+
+    // Calculate speaking rate (words per minute estimate)
+    const speakingRate = totalWords > 0 ? Math.round(totalWords / 2) : 0; // Rough estimate
+
+    // Determine performance ratings
+    const getFluencyRating = (score) => {
+      if (score >= 90) return { variant: 'excellent', text: 'Excellent', explanation: 'Your speech is clear with minimal filler words!' };
+      if (score >= 70) return { variant: 'good', text: 'Good', explanation: 'Your speech is mostly clear. Try reducing filler words.' };
+      return { variant: 'needs-work', text: 'Needs Work', explanation: 'Focus on reducing "um", "uh", and other filler words.' };
+    };
+
+    const getFillerRating = (count, total) => {
+      if (total === 0) return { variant: 'excellent', text: 'Excellent' };
+      const percentage = (count / total) * 100;
+      if (percentage < 5) return { variant: 'excellent', text: 'Excellent' };
+      if (percentage < 10) return { variant: 'good', text: 'Good' };
+      return { variant: 'needs-work', text: 'High' };
+    };
+
+    const getPaceRating = (rate) => {
+      if (rate >= 120 && rate <= 150) return { variant: 'excellent', text: 'Perfect', explanation: 'Your speaking pace is ideal for engagement.' };
+      if (rate >= 100 && rate < 120) return { variant: 'good', text: 'Good', explanation: 'Slightly slow. Try speaking a bit faster.' };
+      if (rate > 150) return { variant: 'good', text: 'Fast', explanation: 'Speaking quickly. Consider slowing down slightly.' };
+      return { variant: 'needs-work', text: 'Slow', explanation: 'Your pace is quite slow. Try speaking more energetically.' };
+    };
+
+    return {
+      totalWords,
+      fillerWordsCount,
+      pausesCount,
+      fluencyScore,
+      speakingRate,
+      fluencyRating: getFluencyRating(fluencyScore),
+      fillerRating: getFillerRating(fillerWordsCount, totalWords),
+      paceRating: getPaceRating(speakingRate)
+    };
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Unknown';
+    try {
+      return new Date(dateString).toLocaleString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+    } catch {
+      return 'Invalid date';
+    }
+  };
 
   // 3. Render Loading/Auth Check State
   if (!authChecked) {
@@ -429,7 +509,6 @@ function Dashboard() {
       );
   }
   
-  // 4. Render Main Content (including error message from state)
   return (
     <DashboardContainer>
       <Header>
@@ -445,7 +524,7 @@ function Dashboard() {
             <h4>⚠️ Oops! Something Went Wrong</h4>
             <p>We couldn't load your presentations: <strong>{error}</strong></p>
             <p style={{ opacity: 0.8, marginTop: '1rem' }}>
-              Please refresh the page or try again later.
+              Please ensure you are logged in, or try refreshing the page.
             </p>
           </ErrorMessage>
         )}
@@ -454,8 +533,7 @@ function Dashboard() {
           <>
             {metadataList.length > 0 ? (
               <div className="d-flex flex-column gap-5">
-                {/* ... (Your metadataList.map logic remains here) ... */}
-                {metadataList.map(item => {
+                {metadataList.map(item => {
                   const analysis = analyzePerformance(item);
 
                   return (

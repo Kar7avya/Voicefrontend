@@ -1,3 +1,5 @@
+// supabaseClient.js
+
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
@@ -28,13 +30,14 @@ export const getCurrentUser = async () => {
   }
 };
 
-// CRITICAL: Provides the JWT token for backend security checks
+// 🔑 FIXED: Returns auth object or NULL, no longer throws on unauthenticated state.
 export const getAuthHeaders = async () => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session?.access_token) {
-      throw new Error('No authentication token found');
+      // If no token, return null so calling function can handle unauthenticated state
+      return null; 
     }
     
     return {
@@ -42,7 +45,8 @@ export const getAuthHeaders = async () => {
     };
   } catch (error) {
     console.error('Get auth headers error:', error);
-    throw error;
+    // If a critical error occurs (e.g., network), still return null.
+    return null;
   }
 };
 
