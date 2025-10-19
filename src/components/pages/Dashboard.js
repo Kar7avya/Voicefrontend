@@ -424,6 +424,8 @@
 
 // dashboard.js - SOPHISTICATED DESIGN VERSION
 
+// dashboard.js - SOPHISTICATED DESIGN VERSION
+
 import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { getAuthHeaders, getCurrentUser } from './supabaseClient'; 
