@@ -943,28 +943,95 @@ function Dashboard() {
     let fillerWordsCount = 0;
     let pausesCount = 0;
     let wordsArray = [];
+    let videoDuration = 0; // in seconds
     
+    // Extract words array from deepgram_words
     if (item.deepgram_words) {
       if (Array.isArray(item.deepgram_words)) {
         wordsArray = item.deepgram_words;
       } else if (typeof item.deepgram_words === 'object' && item.deepgram_words.words) {
         wordsArray = item.deepgram_words.words;
+      } else if (typeof item.deepgram_words === 'object' && Array.isArray(item.deepgram_words)) {
+        wordsArray = item.deepgram_words;
       }
     }
     
-    const fillerWords = ['uh', 'um', 'like', 'you know', 'so', 'and', 'but', 'well', 'actually', 'basically'];
-    fillerWordsCount = wordsArray.filter(word =>
-      fillerWords.includes(word.word?.toLowerCase())
-    ).length;
-    
-    if (item.deepgram_transcript) {
-      const pauses = item.deepgram_transcript.match(/\[PAUSE:.*?\]/g);
-      if (pauses) pausesCount = pauses.length;
+    // Calculate video duration from words (if available)
+    if (wordsArray.length > 0) {
+      const lastWord = wordsArray[wordsArray.length - 1];
+      videoDuration = lastWord.end || lastWord.start || 0;
     }
     
+    // Expanded filler words list
+    const fillerWords = [
+      'uh', 'um', 'uhm', 'er', 'ah',
+      'like', 'you know', 'y\'know', 'you know what',
+      'so', 'and', 'but', 'well', 'actually', 'basically',
+      'kind of', 'sort of', 'kinda', 'sorta',
+      'right', 'okay', 'ok', 'alright',
+      'i mean', 'i guess', 'i think',
+      'you see', 'see', 'look'
+    ];
+    
+    // Count filler words - check multiple word properties
+    // Deepgram words structure: { word: "hello", start: 0.5, end: 0.8, ... }
+    fillerWordsCount = wordsArray.filter(word => {
+      // Try different possible property names for the word text
+      const wordText = (
+        word.word || 
+        word.punctuated_word || 
+        word.text || 
+        (typeof word === 'string' ? word : '')
+      ).toLowerCase().trim();
+      
+      if (!wordText) return false;
+      
+      // Remove punctuation for better matching
+      const cleanWord = wordText.replace(/[.,!?;:]/g, '');
+      
+      // Check exact matches first
+      if (fillerWords.includes(cleanWord)) return true;
+      
+      // Check if word contains filler (for compound fillers like "you know")
+      // But only for multi-word fillers to avoid false positives
+      const multiWordFillers = ['you know', 'you know what', 'i mean', 'i guess', 'i think', 'kind of', 'sort of'];
+      return multiWordFillers.some(filler => cleanWord.includes(filler));
+    }).length;
+    
+    // Count pauses from transcript
+    if (item.deepgram_transcript) {
+      const pauses = item.deepgram_transcript.match(/\[PAUSE:[^\]]+\]/g);
+      if (pauses) {
+        pausesCount = pauses.length;
+      }
+    }
+    
+    // Calculate total words (exclude pause markers from transcript if counting from transcript)
     const totalWords = wordsArray.length;
-    const fluencyScore = totalWords > 0 ? ((totalWords - fillerWordsCount) / totalWords) * 100 : 100;
-    const speakingRate = totalWords > 0 ? Math.round(totalWords / 2) : 0; 
+    
+    // Calculate fluency score (percentage of non-filler words)
+    const fluencyScore = totalWords > 0 
+      ? Math.round(((totalWords - fillerWordsCount) / totalWords) * 100) 
+      : 0;
+    
+    // Calculate speaking rate (Words Per Minute)
+    // WPM = (total words / duration in minutes)
+    let speakingRate = 0;
+    if (totalWords > 0 && videoDuration > 0) {
+      const durationInMinutes = videoDuration / 60;
+      speakingRate = Math.round(totalWords / durationInMinutes);
+    } else if (totalWords > 0) {
+      // Fallback: If we have words but no duration, try to get duration from metadata
+      // or use a conservative estimate (assume average speaking rate of 150 WPM)
+      // This is just a placeholder - ideally we should have video duration
+      if (item.video_duration) {
+        const durationInMinutes = item.video_duration / 60;
+        speakingRate = Math.round(totalWords / durationInMinutes);
+      } else {
+        // Can't calculate without duration - leave as 0
+        speakingRate = 0;
+      }
+    } 
 
     const getFluencyRating = (score) => {
       if (score >= 90) return { variant: 'excellent', text: 'Excellent', explanation: 'Your speech is clear with minimal filler words!' };
@@ -981,9 +1048,12 @@ function Dashboard() {
     };
 
     const getPaceRating = (rate) => {
-      if (rate >= 120 && rate <= 150) return { variant: 'excellent', text: 'Perfect', explanation: 'Your speaking pace is ideal for engagement.' };
+      if (rate === 0) {
+        return { variant: 'needs-work', text: 'N/A', explanation: 'Unable to calculate speaking rate. Video may be too short or no speech detected.' };
+      }
+      if (rate >= 120 && rate <= 180) return { variant: 'excellent', text: 'Perfect', explanation: 'Your speaking pace is ideal for engagement.' };
       if (rate >= 100 && rate < 120) return { variant: 'good', text: 'Good', explanation: 'Slightly slow. Try speaking a bit faster.' };
-      if (rate > 150) return { variant: 'good', text: 'Fast', explanation: 'Speaking quickly. Consider slowing down slightly.' };
+      if (rate > 180) return { variant: 'good', text: 'Fast', explanation: 'Speaking quickly. Consider slowing down slightly.' };
       return { variant: 'needs-work', text: 'Slow', explanation: 'Your pace is quite slow. Try speaking more energetically.' };
     };
     
@@ -1085,7 +1155,7 @@ function Dashboard() {
                         </ScoreCard>
                         
                         <ScoreCard variant={analysis.paceRating.variant}>
-                          <ScoreValue>{analysis.speakingRate}</ScoreValue>
+                          <ScoreValue>{analysis.speakingRate > 0 ? analysis.speakingRate : 'N/A'}</ScoreValue>
                           <ScoreLabel>Words Per Minute</ScoreLabel>
                           <ScoreExplanation>{analysis.paceRating.explanation}</ScoreExplanation>
                         </ScoreCard>
@@ -1153,13 +1223,39 @@ function Dashboard() {
                         <ContentBlock>
                           <BlockTitle>📈 Quick Stats</BlockTitle>
                           <BlockContent style={{ display: 'grid', gap: '0.75rem' }}>
-                            <div>✅ <strong>Total Words Spoken:</strong> {analysis.totalWords}</div>
-                            <div>⚠️ <strong>Times You Used Fillers:</strong> {analysis.fillerWordsCount} 
-                              {analysis.fillerWordsCount > 0 && <span style={{ fontSize: '0.85em', opacity: 0.7 }}> (Words like "um", "uh", "like")</span>}
+                            <div>✅ <strong>Total Words Spoken:</strong> {analysis.totalWords || 0}</div>
+                            <div>⚠️ <strong>Filler Words Used:</strong> {analysis.fillerWordsCount || 0} 
+                              {analysis.fillerWordsCount > 0 && (
+                                <span style={{ fontSize: '0.85em', opacity: 0.7 }}> 
+                                  ({((analysis.fillerWordsCount / analysis.totalWords) * 100).toFixed(1)}% of total words)
+                                </span>
+                              )}
+                              {analysis.fillerWordsCount === 0 && analysis.totalWords > 0 && (
+                                <span style={{ fontSize: '0.85em', opacity: 0.7, color: '#4ade80' }}> 
+                                  (Excellent! No filler words detected)
+                                </span>
+                              )}
                             </div>
-                            <div>⏸️ <strong>Speech Pauses:</strong> {analysis.pausesCount} 
-                              {analysis.pausesCount > 0 && <span style={{ fontSize: '0.85em', opacity: 0.7 }}> (Natural breaks in your speech)</span>}
+                            <div>⏸️ <strong>Speech Pauses:</strong> {analysis.pausesCount || 0} 
+                              {analysis.pausesCount > 0 && (
+                                <span style={{ fontSize: '0.85em', opacity: 0.7 }}> 
+                                  (Natural breaks in your speech)
+                                </span>
+                              )}
+                              {analysis.pausesCount === 0 && analysis.totalWords > 0 && (
+                                <span style={{ fontSize: '0.85em', opacity: 0.7 }}> 
+                                  (Smooth, continuous speech)
+                                </span>
+                              )}
                             </div>
+                            {analysis.speakingRate > 0 && (
+                              <div>📊 <strong>Speaking Rate:</strong> {analysis.speakingRate} words per minute</div>
+                            )}
+                            {analysis.totalWords === 0 && (
+                              <div style={{ color: '#fbbf24', fontSize: '0.9rem', fontStyle: 'italic' }}>
+                                ⚠️ No words detected. The video may not contain speech or transcription is still processing.
+                              </div>
+                            )}
                           </BlockContent>
                         </ContentBlock>
 
