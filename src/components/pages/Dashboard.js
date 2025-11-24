@@ -1308,10 +1308,10 @@
 // //fixed
 // export default Dashboard;
 import React, { useState, useEffect } from "react";
-import { getAuthHeaders, getCurrentUser } from "./supabaseClient";
 import { useNavigate } from "react-router-dom";
+import { getAuthHeaders, getCurrentUser } from "./supabaseClient";
 
-function Dashboard() {
+const Dashboard = () => {
   const navigate = useNavigate();
   const [metadataList, setMetadataList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1319,6 +1319,7 @@ function Dashboard() {
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
+
   const BACKEND_URL =
     process.env.REACT_APP_BACKEND_URL || "https://voicebackend-20.onrender.com";
 
@@ -1350,9 +1351,8 @@ function Dashboard() {
         setIsLoading(true);
         setError(null);
         const authHeaders = await getAuthHeaders();
-        if (!authHeaders) {
-          throw new Error("Session expired. Please log in again.");
-        }
+        if (!authHeaders) throw new Error("Session expired. Please log in again.");
+
         const response = await fetch(`${BACKEND_URL}/api/metadata`, {
           method: "GET",
           headers: {
@@ -1379,16 +1379,15 @@ function Dashboard() {
         const data = await response.json();
         if (Array.isArray(data)) {
           setMetadataList(data);
-        } else if (Array.isArray(data?.data)) {
+        } else if (data.success && Array.isArray(data.data)) {
+          setMetadataList(data.data);
+        } else if (data.data && Array.isArray(data.data)) {
           setMetadataList(data.data);
         } else {
           setMetadataList([]);
         }
       } catch (err) {
-        if (
-          err.message.includes("Session expired") ||
-          err.message.includes("Access denied")
-        ) {
+        if (err.message.includes("Session expired") || err.message.includes("Access denied")) {
           setError(`Authentication failed: ${err.message}. Redirecting to login...`);
           setTimeout(() => navigate("/login"), 2000);
         } else {
@@ -1430,6 +1429,7 @@ function Dashboard() {
       "ah",
       "like",
       "you know",
+      "y'know",
       "you know what",
       "so",
       "and",
@@ -1462,11 +1462,9 @@ function Dashboard() {
       )
         .toLowerCase()
         .trim();
-
       if (!wordText) return false;
       const cleanWord = wordText.replace(/[.,!?;:]/g, "");
       if (fillerWords.includes(cleanWord)) return true;
-
       const multiWordFillers = [
         "you know",
         "you know what",
@@ -1476,7 +1474,7 @@ function Dashboard() {
         "kind of",
         "sort of",
       ];
-      return multiWordFillers.some((f) => cleanWord.includes(f));
+      return multiWordFillers.some((filler) => cleanWord.includes(filler));
     }).length;
 
     if (item.deepgram_transcript) {
@@ -1528,7 +1526,7 @@ function Dashboard() {
     const getPaceRating = (rate) => {
       if (rate === 0) {
         return {
-          variant: "secondary",
+          variant: "danger",
           text: "N/A",
           explanation:
             "Unable to calculate speaking rate. Video may be too short or no speech detected.",
@@ -1541,14 +1539,14 @@ function Dashboard() {
           explanation: "Your speaking pace is ideal for engagement.",
         };
       if (rate >= 100 && rate < 120)
-        return { variant: "warning", text: "Good", explanation: "Slightly slow. Try speaking faster." };
+        return { variant: "warning", text: "Good", explanation: "Slightly slow. Try speeding up." };
       if (rate > 180)
-        return { variant: "warning", text: "Fast", explanation: "Speaking quickly. Consider slowing down." };
-      return {
-        variant: "danger",
-        text: "Slow",
-        explanation: "Your pace is quite slow. Try speaking more energetically.",
-      };
+        return {
+          variant: "warning",
+          text: "Fast",
+          explanation: "Speaking quickly. Consider slowing down slightly.",
+        };
+      return { variant: "danger", text: "Slow", explanation: "Try speaking more energetically." };
     };
 
     return {
@@ -1580,15 +1578,13 @@ function Dashboard() {
 
   if (!authChecked) {
     return (
-      <div className="dashboard-bg min-vh-100 text-light">
-        <header className="py-4 border-bottom border-light-subtle bg-opacity-25 bg-black sticky-top">
-          <div className="container">
-            <h1 className="h2 mb-0">Dashboard</h1>
+      <div className="bg-dark text-light min-vh-100">
+        <div className="container py-5">
+          <h1 className="mb-4">Dashboard</h1>
+          <div className="d-flex flex-column align-items-center py-5">
+            <div className="spinner-border text-primary mb-4" role="status" />
+            <p>Checking authentication status...</p>
           </div>
-        </header>
-        <div className="d-flex flex-column justify-content-center align-items-center vh-75 text-center">
-          <div className="spinner-border text-info mb-3" role="status" />
-          <p>Checking authentication status...</p>
         </div>
       </div>
     );
@@ -1596,26 +1592,24 @@ function Dashboard() {
 
   if (isLoading && !dataLoaded) {
     return (
-      <div className="dashboard-bg min-vh-100 text-light">
-        <header className="py-4 border-bottom border-light-subtle bg-opacity-25 bg-black sticky-top">
-          <div className="container">
-            <h1 className="h2 mb-0">Dashboard</h1>
+      <div className="bg-dark text-light min-vh-100">
+        <div className="container py-5">
+          <h1 className="mb-4">Dashboard</h1>
+          <div className="d-flex flex-column align-items-center py-5">
+            <div className="spinner-border text-primary mb-4" role="status" />
+            <p>Loading your presentations...</p>
           </div>
-        </header>
-        <div className="d-flex flex-column justify-content-center align-items-center vh-75 text-center">
-          <div className="spinner-border text-info mb-3" role="status" />
-          <p>Loading your presentations...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="dashboard-bg min-vh-100 text-light">
-      <header className="py-5 border-bottom border-light-subtle bg-opacity-25 bg-black sticky-top">
+    <div className="bg-dark text-light min-vh-100">
+      <header className="bg-dark bg-opacity-75 border-bottom border-secondary sticky-top py-4 shadow">
         <div className="container">
-          <h1 className="display-5 fw-bold text-gradient mb-2">Your Presentation Dashboard</h1>
-          <p className="text-white-50 mb-0">
+          <h1 className="display-5 fw-bold mb-2 text-white">Your Presentation Dashboard</h1>
+          <p className="text-secondary mb-0">
             See how well you presented and get tips to improve your speaking skills
           </p>
         </div>
@@ -1623,11 +1617,10 @@ function Dashboard() {
 
       <main className="container py-5">
         {error && (
-          <div className="alert alert-danger shadow-sm" role="alert">
-            <h4 className="alert-heading mb-2">⚠️ Oops! Something Went Wrong</h4>
-            <p>
-              We couldn't load your presentations: <strong>{error}</strong>
-            </p>
+          <div className="alert alert-danger shadow-lg" role="alert">
+            <h4 className="alert-heading">⚠️ Oops! Something Went Wrong</h4>
+            <p>We couldn't load your presentations: {error}</p>
+            <hr />
             <p className="mb-0">Please ensure you are logged in, or try refreshing the page.</p>
           </div>
         )}
@@ -1639,183 +1632,200 @@ function Dashboard() {
                 const analysis = analyzePerformance(item);
                 return (
                   <div className="card bg-dark border-secondary mb-4 shadow-lg" key={item.id}>
-                    <div className="card-header border-secondary bg-opacity-50 bg-black">
-                      <h3 className="h4 text-white mb-1">
+                    <div className="card-header bg-transparent border-secondary py-4">
+                      <h2 className="h4 text-white mb-1">
                         🎥 {item.original_name || item.video_name || "Untitled Presentation"}
-                      </h3>
-                      <p className="text-white-50 mb-3">Uploaded on {formatDate(item.created_at)}</p>
+                      </h2>
+                      <p className="text-secondary mb-4">
+                        Uploaded on {formatDate(item.created_at)}
+                      </p>
 
                       <div className="row g-3">
-                        <div className="col-md-4">
-                          <div className={`card text-center border-${analysis.fluencyRating.variant}`}>
-                            <div className="card-body">
-                              <div className="display-5 fw-bold">{analysis.fluencyScore.toFixed(0)}%</div>
-                              <div className="text-uppercase small text-white-50 mb-2">Speech Clarity</div>
-                              <div className="text-white-50">{analysis.fluencyRating.explanation}</div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="col-md-4">
-                          <div className={`card text-center border-${analysis.paceRating.variant}`}>
-                            <div className="card-body">
-                              <div className="display-5 fw-bold">
-                                {analysis.speakingRate > 0 ? analysis.speakingRate : "N/A"}
+                        {[
+                          {
+                            variant: analysis.fluencyRating.variant,
+                            value: `${analysis.fluencyScore.toFixed(0)}%`,
+                            label: "Speech Clarity",
+                            explanation: analysis.fluencyRating.explanation,
+                          },
+                          {
+                            variant: analysis.paceRating.variant,
+                            value: analysis.speakingRate > 0 ? analysis.speakingRate : "N/A",
+                            label: "Words Per Minute",
+                            explanation: analysis.paceRating.explanation,
+                          },
+                          {
+                            variant: analysis.fillerRating.variant,
+                            value: analysis.fillerWordsCount,
+                            label: "Filler Words Used",
+                            explanation:
+                              analysis.fillerRating.text === "Excellent"
+                                ? "Great job avoiding filler words!"
+                                : analysis.fillerRating.text === "Good"
+                                ? "Keep working on reducing fillers."
+                                : 'Try to pause instead of saying "um" or "uh".',
+                          },
+                        ].map((card, idx) => (
+                          <div className="col-md-4" key={idx}>
+                            <div
+                              className={`p-4 rounded border border-${card.variant} bg-${card.variant} bg-opacity-10 h-100`}
+                            >
+                              <div className="h1 fw-bold text-white">{card.value}</div>
+                              <div className="text-uppercase text-secondary small mb-2">
+                                {card.label}
                               </div>
-                              <div className="text-uppercase small text-white-50 mb-2">Words Per Minute</div>
-                              <div className="text-white-50">{analysis.paceRating.explanation}</div>
+                              <p className="text-muted mb-0">{card.explanation}</p>
                             </div>
                           </div>
-                        </div>
-
-                        <div className="col-md-4">
-                          <div className={`card text-center border-${analysis.fillerRating.variant}`}>
-                            <div className="card-body">
-                              <div className="display-5 fw-bold">{analysis.fillerWordsCount}</div>
-                              <div className="text-uppercase small text-white-50 mb-2">Filler Words Used</div>
-                              <div className="text-white-50">
-                                {analysis.fillerRating.text === "Excellent" && "Great job avoiding filler words!"}
-                                {analysis.fillerRating.text === "Good" && "Keep working on reducing fillers."}
-                                {analysis.fillerRating.text === "High" &&
-                                  'Try to pause instead of saying "um" or "uh".'}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                        ))}
                       </div>
                     </div>
 
-                    <div className="card-body row g-4">
-                      <div className="col-lg-5">
-                        <h5 className="text-white mb-3">▶️ Watch Your Presentation</h5>
-                        <div className="ratio ratio-16x9 bg-black rounded">
-                          {item.video_url || item.public_url ? (
-                            <video controls src={item.video_url || item.public_url} className="rounded" />
-                          ) : (
-                            <div className="d-flex justify-content-center align-items-center text-white-50">
-                              Video not available
+                    <div className="card-body">
+                      <div className="row g-4">
+                        <div className="col-lg-5">
+                          <h5 className="text-white mb-3">▶️ Watch Your Presentation</h5>
+                          <div className="ratio ratio-16x9 bg-secondary bg-opacity-25 rounded border border-secondary">
+                            {item.video_url || item.public_url ? (
+                              <video
+                                controls
+                                className="w-100 h-100 rounded"
+                                src={item.video_url || item.public_url}
+                              />
+                            ) : (
+                              <div className="d-flex align-items-center justify-content-center text-muted">
+                                Video not available
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="col-lg-7">
+                          <h5 className="text-white mb-3">📊 Your Performance Breakdown</h5>
+
+                          <div className="alert alert-info bg-opacity-25 border-info text-white-50">
+                            <strong className="text-white">What do these numbers mean?</strong>
+                            <p className="mb-0">
+                              We analyzed your presentation to help you understand your speaking
+                              patterns and give you actionable tips for improvement.
+                            </p>
+                          </div>
+
+                          <div className="card bg-dark border-secondary mb-3">
+                            <div className="card-body">
+                              <h6 className="text-white mb-3">📝 What You Said</h6>
+                              <p className="text-white-50">
+                                {item.deepgram_transcript ||
+                                  item.elevenlabs_transcript ||
+                                  "Your speech transcript will appear here after processing."}
+                              </p>
+                              <div className="alert alert-warning bg-opacity-25 border-warning text-white-50 mb-0">
+                                <strong className="text-white">Tip:</strong> Read through your
+                                transcript to spot repeated phrases you might want to avoid in future
+                                presentations.
+                              </div>
+                            </div>
+                          </div>
+
+                          {item.gemini_analysis && (
+                            <div className="card bg-dark border-secondary mb-3">
+                              <div className="card-body">
+                                <h6 className="text-white mb-3">🤖 AI Coach Feedback</h6>
+                                <p className="text-white-50 mb-3">{item.gemini_analysis}</p>
+                                <div className="alert alert-warning bg-opacity-25 border-warning text-white-50 mb-0">
+                                  <strong className="text-white">Tip:</strong> Focus on one
+                                  improvement area at a time!
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="card bg-dark border-secondary mb-3">
+                            <div className="card-body">
+                              <h6 className="text-white mb-3">📈 Quick Stats</h6>
+                              <div className="text-white-50">
+                                <div className="mb-2">
+                                  ✅ <strong>Total Words Spoken:</strong>{" "}
+                                  {analysis.totalWords || 0}
+                                </div>
+                                <div className="mb-2">
+                                  ⚠️ <strong>Filler Words Used:</strong>{" "}
+                                  {analysis.fillerWordsCount || 0}
+                                  {analysis.fillerWordsCount > 0 && (
+                                    <span className="text-muted small">
+                                      {" "}
+                                      (
+                                      {(
+                                        (analysis.fillerWordsCount / analysis.totalWords) *
+                                        100
+                                      ).toFixed(1)}
+                                      % of total words)
+                                    </span>
+                                  )}
+                                  {analysis.fillerWordsCount === 0 && analysis.totalWords > 0 && (
+                                    <span className="text-success small">
+                                      {" "}
+                                      (Excellent! No filler words detected)
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="mb-2">
+                                  ⏸️ <strong>Speech Pauses:</strong> {analysis.pausesCount || 0}
+                                  {analysis.pausesCount > 0 && (
+                                    <span className="text-muted small">
+                                      {" "}
+                                      (Natural breaks in your speech)
+                                    </span>
+                                  )}
+                                </div>
+                                {analysis.speakingRate > 0 && (
+                                  <div className="mb-2">
+                                    📊 <strong>Speaking Rate:</strong>{" "}
+                                    {analysis.speakingRate} words per minute
+                                  </div>
+                                )}
+                                {analysis.totalWords === 0 && (
+                                  <div className="text-warning small">
+                                    ⚠️ No words detected. The video may not contain speech or
+                                    transcription is still processing.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {item.frames && Array.isArray(item.frames) && item.frames.length > 0 && (
+                            <div className="card bg-dark border-secondary">
+                              <div className="card-body">
+                                <h6 className="text-white mb-3">
+                                  🖼️ Snapshots ({item.frames.length})
+                                </h6>
+                                <p className="text-white-50 small">
+                                  These are key moments captured from your video. Click any image to
+                                  view it larger.
+                                </p>
+                                <div className="row g-2">
+                                  {item.frames.map((frame, index) => (
+                                    <div className="col-6 col-md-4 col-lg-3" key={index}>
+                                      <a
+                                        href={frame.frame_url || frame.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="d-block"
+                                      >
+                                        <img
+                                          src={frame.frame_url || frame.url}
+                                          alt={`Moment ${index + 1}`}
+                                          className="img-fluid rounded border border-secondary"
+                                        />
+                                      </a>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
                             </div>
                           )}
                         </div>
-                      </div>
-
-                      <div className="col-lg-7">
-                        <h5 className="text-white mb-3">📊 Your Performance Breakdown</h5>
-
-                        <div className="alert alert-info bg-opacity-25 border-info text-white">
-                          <strong>What do these numbers mean?</strong>
-                          <br />
-                          We analyzed your presentation to help you understand your speaking patterns and
-                          give you actionable tips for improvement.
-                        </div>
-
-                        <div className="card bg-black border-secondary mb-3">
-                          <div className="card-body">
-                            <h6 className="text-white">📝 What You Said</h6>
-                            <p className="text-white-50 mb-3">
-                              {item.deepgram_transcript ||
-                                item.elevenabs_transcript ||
-                                "Your speech transcript will appear here after processing."}
-                            </p>
-                            <div className="alert alert-warning bg-opacity-25 border-warning text-white-50">
-                              <strong>Tip:</strong> Read through your transcript to spot repeated phrases or
-                              words you might want to avoid in future presentations.
-                            </div>
-                          </div>
-                        </div>
-
-                        {item.gemini_analysis && (
-                          <div className="card bg-black border-secondary mb-3">
-                            <div className="card-body">
-                              <h6 className="text-white">🤖 AI Coach Feedback</h6>
-                              <p className="text-white-50 mb-3">{item.gemini_analysis}</p>
-                              <div className="alert alert-primary bg-opacity-25 border-primary text-white-50">
-                                <strong>Tip:</strong> This personalized feedback is based on analyzing your
-                                entire presentation. Focus on one improvement area at a time!
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="card bg-black border-secondary mb-3">
-                          <div className="card-body">
-                            <h6 className="text-white">📈 Quick Stats</h6>
-                            <ul className="list-group list-group-flush bg-transparent">
-                              <li className="list-group-item bg-transparent text-white-50 border-secondary">
-                                ✅ <strong>Total Words Spoken:</strong> {analysis.totalWords || 0}
-                              </li>
-                              <li className="list-group-item bg-transparent text-white-50 border-secondary">
-                                ⚠️ <strong>Filler Words Used:</strong>{" "}
-                                {analysis.fillerWordsCount || 0}
-                                {analysis.fillerWordsCount > 0 && (
-                                  <span className="ms-2 text-muted small">
-                                    (
-                                    {(
-                                      (analysis.fillerWordsCount / Math.max(analysis.totalWords, 1)) *
-                                      100
-                                    ).toFixed(1)}
-                                    % of total words)
-                                  </span>
-                                )}
-                                {analysis.fillerWordsCount === 0 && analysis.totalWords > 0 && (
-                                  <span className="ms-2 text-success small">
-                                    (Excellent! No filler words detected)
-                                  </span>
-                                )}
-                              </li>
-                              <li className="list-group-item bg-transparent text-white-50 border-secondary">
-                                ⏸️ <strong>Speech Pauses:</strong> {analysis.pausesCount || 0}
-                                {analysis.pausesCount === 0 && analysis.totalWords > 0 && (
-                                  <span className="ms-2 text-muted small">
-                                    (Smooth, continuous speech)
-                                  </span>
-                                )}
-                              </li>
-                              {analysis.speakingRate > 0 && (
-                                <li className="list-group-item bg-transparent text-white-50 border-secondary">
-                                  📊 <strong>Speaking Rate:</strong> {analysis.speakingRate} words per minute
-                                </li>
-                              )}
-                              {analysis.totalWords === 0 && (
-                                <li className="list-group-item bg-transparent text-warning border-secondary">
-                                  ⚠️ No words detected. The video may not contain speech or transcription is still
-                                  processing.
-                                </li>
-                              )}
-                            </ul>
-                          </div>
-                        </div>
-
-                        {item.frames && Array.isArray(item.frames) && item.frames.length > 0 && (
-                          <div className="card bg-black border-secondary">
-                            <div className="card-body">
-                              <h6 className="text-white">
-                                🖼️ Snapshots from Your Presentation ({item.frames.length})
-                              </h6>
-                              <p className="text-white-50">
-                                These are key moments we captured from your video. Click any image to view it
-                                larger.
-                              </p>
-                              <div className="row g-3">
-                                {item.frames.map((frame, index) => (
-                                  <div className="col-6 col-sm-4 col-md-3" key={index}>
-                                    <a
-                                      href={frame.frame_url || frame.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
-                                      <img
-                                        src={frame.frame_url || frame.url}
-                                        alt={`Moment ${index + 1}`}
-                                        className="img-fluid rounded"
-                                      />
-                                    </a>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -1823,13 +1833,13 @@ function Dashboard() {
               })
             ) : (
               <div className="card bg-dark border-secondary text-center p-5 shadow-lg">
-                <div className="display-3 mb-3 opacity-50">🎥</div>
+                <div className="display-1 opacity-50 mb-3">🎥</div>
                 <h4 className="text-white mb-3">No Presentations Yet</h4>
                 <p className="text-white-50 mb-4">
-                  Upload your first video presentation and we'll analyze your speaking skills, giving you
-                  personalized feedback to help you improve!
+                  Upload your first video presentation and we'll analyze your speaking skills,
+                  giving you personalized feedback to help you improve!
                 </p>
-                <a href="/upload" className="btn btn-primary btn-lg">
+                <a href="/upload" className="btn btn-primary btn-lg px-4">
                   📤 Upload Your First Presentation
                 </a>
               </div>
@@ -1839,21 +1849,10 @@ function Dashboard() {
       </main>
 
       <style>{`
-        .dashboard-bg {
-          background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-        }
-        .text-gradient {
-          background: linear-gradient(135deg, #ffffff 0%, #94a3b8 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-        .vh-75 {
-          min-height: 75vh;
-        }
+        body { background-color: #0f172a; color: #e2e8f0; }
       `}</style>
     </div>
   );
-}
+};
 
 export default Dashboard;
