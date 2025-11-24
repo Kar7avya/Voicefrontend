@@ -1,6 +1,6 @@
 import "../navigators/Header.css";
 import React, { useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";   // ⬅ added useNavigate
+import { NavLink, useNavigate } from "react-router-dom";   
 import { toast } from "react-toastify";                   // ⬅ added toast
 import supabase from "../pages/supabaseClient";                 // ⬅ make sure path is correct
 import "bootstrap/dist/css/bootstrap.min.css";
