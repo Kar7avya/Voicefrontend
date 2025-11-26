@@ -1460,7 +1460,7 @@ import supabase from "./supabaseClient";
 import shivajiImage from "../pages/shivaji.jpg";
 import savarkarImage from "../pages/veersavarkar.jpg";
 import boseImage from "../pages/subhashchandrabose.jpg";
-import vivekanandaImage from "../pages/vivekananda.jpg";
+import vivekanandaImage from "../pages/swamivivekanand.jpg";
 
 const slides = [
   {
