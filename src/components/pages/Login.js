@@ -503,7 +503,7 @@ import { Eye, EyeOff } from "lucide-react";
 import supabase from "./supabaseClient";
 import aurobindoImage from "../pages/aurobindo.jpg";
 import shivajiImage from "../pages/shivaji.jpg";
-import swamivivekanandaImage from "../pages/swamivivekananda.jpg";
+import swamivivekanandaImage from "../pages/swamivivekanand.jpg";
 import veersavarkarImage from "../pages/veersavarkar.jpg";
 
 const slides = [
