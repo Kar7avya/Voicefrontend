@@ -501,25 +501,29 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Eye, EyeOff } from "lucide-react";
 import supabase from "./supabaseClient";
+import aurobindoImage from "../pages/aurobindo.jpg";
+import shivajiImage from "../pages/shivaji.jpg";
+import swamivivekanandaImage from "../pages/swamivivekananda.jpg";
+import veersavarkarImage from "../pages/veersavarkar.jpg";
 
 const slides = [
   {
-    image: "https://images.unsplash.com/photo-1604610525665-6973305ff0b4?w=800&h=1600&fit=crop&q=80",
+    image: shivajiImage,
     quote: "Freedom is a boon, which everyone has the right to receive.",
     author: "Chhatrapati Shivaji Maharaj",
   },
   {
-    image: "https://images.unsplash.com/photo-1618556947959-ec9d4c1d8bf3?w=800&h=1600&fit=crop&q=80",
+    image: aurobindoImage,
     quote: "Sanatan Dharma, that is Nationalism.",
     author: "Sri Aurobindo",
   },
   {
-    image: "https://images.unsplash.com/photo-1583324113626-70df0f4deaab?w=800&h=1600&fit=crop&q=80",
+    image: veersavarkarImage,
     quote: "Give me blood, and I shall give you freedom.",
     author: "Subhash Chandra Bose",
   },
   {
-    image: "https://images.unsplash.com/photo-1604610525665-6973305ff0b4?w=800&h=1600&fit=crop&q=80",
+    image: swamivivekanandaImage,
     quote: "Arise, awake and stop not till the goal is reached.",
     author: "Swami Vivekananda",
   },

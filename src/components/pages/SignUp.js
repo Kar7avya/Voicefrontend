@@ -1457,25 +1457,29 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Eye, EyeOff } from "lucide-react";
 import supabase from "./supabaseClient";
+import shivajiImage from "../pages/shivaji.jpg";
+import savarkarImage from "../pages/savarkar.jpg";
+import boseImage from "../pages/subhashchandrabose.jpg";
+import vivekanandaImage from "../pages/vivekananda.jpg";
 
 const slides = [
   {
-    image: "https://images.unsplash.com/photo-1604610525665-6973305ff0b4?w=900&h=1600&fit=crop&q=80",
+    image: shivajiImage,
     quote: "Freedom is a boon, which everyone has the right to receive.",
     author: "Chhatrapati Shivaji Maharaj",
   },
   {
-    image: "https://images.unsplash.com/photo-1618556947959-ec9d4c1d8bf3?w=900&h=1600&fit=crop&q=80",
+    image: savarkarImage,
     quote: "Let us remember that the sole aim and objective is to secure the Hindu nation.",
     author: "Veer Savarkar",
   },
   {
-    image: "https://images.unsplash.com/photo-1583324113626-70df0f4deaab?w=900&h=1600&fit=crop&q=80",
+    image: boseImage,
     quote: "Give me blood, and I shall give you freedom.",
     author: "Subhash Chandra Bose",
   },
   {
-    image: "https://images.unsplash.com/photo-1604610525665-6973305ff0b4?w=900&h=1600&fit=crop&q=80",
+    image: vivekanandaImage,
     quote: "Arise, awake and stop not till the goal is reached.",
     author: "Swami Vivekananda",
   },
