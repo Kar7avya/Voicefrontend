@@ -664,7 +664,7 @@ const Login = () => {
         <div className="col-lg-6 d-none d-lg-flex flex-column p-0 position-relative">
           <div className="w-100 h-100 position-relative">
             <div className="position-absolute top-0 start-0 m-4 fw-bold fs-3 letter-spacing-3">
-              AMLI
+              
             </div>
 
             {slides.map((slide, index) => (

@@ -1619,7 +1619,7 @@ const SignUp = () => {
       <div className="row min-vh-100">
         {/* Carousel side */}
         <div className="col-lg-6 d-none d-lg-flex flex-column p-0 position-relative">
-          <div className="position-absolute top-0 start-0 m-4 fw-bold fs-3 letter-spacing-3 z-3">AMLI</div>
+          <div className="position-absolute top-0 start-0 m-4 fw-bold fs-3 letter-spacing-3 z-3"></div>
           <button
             className="btn btn-outline-light position-absolute top-0 end-0 m-4 z-3"
             onClick={() => (window.location.href = "/")}
