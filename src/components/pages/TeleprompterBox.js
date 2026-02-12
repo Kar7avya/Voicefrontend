@@ -471,7 +471,6 @@ function analyzeRhythmDrift(perLine) {
 
   const third = Math.floor(perLine.length / 3);
   const early = perLine.slice(0, third);
-  const middle = perLine.slice(third, third * 2);
   const late = perLine.slice(third * 2);
 
   const avg = arr => arr.reduce((s, l) => s + l.paceRatio, 0) / arr.length;
@@ -554,10 +553,10 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
   const [isRunning, setIsRunning] = useState(false);
   const [currentLine, setCurrentLine] = useState(0);
   const [currentWord, setCurrentWord] = useState(0);
-  const [wpm, setWpm] = useState(120);
+  const [wpm] = useState(120);
 
   const [sessionStart, setSessionStart] = useState(null);
-  const [events, setEvents] = useState([]);
+  const [, setEvents] = useState([]);
 
   /* ===== DAY 1 UI STATE ===== */
   const [sessionScoreUI, setSessionScoreUI] = useState(null);
