@@ -1,6 +1,6 @@
 import "../navigators/Header.css";
 import React, { useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";   
+import { NavLink, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";                   // ⬅ added toast
 import supabase from "../pages/supabaseClient";                 // ⬅ make sure path is correct
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -32,9 +32,8 @@ const Header = () => {
 
   return (
     <nav
-      className={`navbar navbar-expand-lg navbar-dark bg-dark static-top ${
-        scrolled ? "shadow-sm" : ""
-      }`}
+      className={`navbar navbar-expand-lg navbar-dark bg-dark static-top ${scrolled ? "shadow-sm" : ""
+        }`}
     >
       <div className="container">
         {/* Brand / Logo */}
@@ -101,6 +100,17 @@ const Header = () => {
                 to="/voicestudio"
               >
                 Voice Studio
+              </NavLink>
+            </li>
+
+            <li className="nav-item">
+              <NavLink
+                className={({ isActive }) =>
+                  `nav-link ${isActive ? "active" : ""}`
+                }
+                to="/teleprompter"
+              >
+                Teleprompter
               </NavLink>
             </li>
 

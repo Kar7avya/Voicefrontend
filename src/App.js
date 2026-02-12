@@ -13,6 +13,7 @@ import Dashboard from './components/pages/Dashboard';
 import AuthCallback from './components/pages/AuthCallback';
 import supabase from './components/pages/supabaseClient';
 import VoiceStudio from './components/pages/VoiceStudio';
+import Teleprompter from './components/pages/Teleprompter';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -24,13 +25,13 @@ const ProtectedRoute = ({ children }) => {
       try {
         // Get current session from Supabase
         const { data: { session }, error } = await supabase.auth.getSession();
-        
+
         if (error) {
           console.error('Auth check error:', error);
           setIsAuthenticated(false);
         } else {
           setIsAuthenticated(!!session);
-          
+
           // Store/update tokens if session exists
           if (session) {
             localStorage.setItem('access_token', session.access_token);
@@ -53,7 +54,7 @@ const ProtectedRoute = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session);
-        
+
         if (event === 'SIGNED_IN' && session) {
           setIsAuthenticated(true);
           localStorage.setItem('access_token', session.access_token);
@@ -150,9 +151,9 @@ const PublicRoute = ({ children }) => {
 function App() {
   return (
     <Router>
-      <ToastContainer 
-        position="top-center" 
-        autoClose={3000} 
+      <ToastContainer
+        position="top-center"
+        autoClose={3000}
         theme="colored"
         hideProgressBar={false}
         newestOnTop={false}
@@ -165,40 +166,40 @@ function App() {
 
       <Routes>
         {/* Root redirect - smart routing based on auth state */}
-        <Route 
-          path="/" 
+        <Route
+          path="/"
           element={
             <PublicRoute>
               <Navigate to="/login" replace />
             </PublicRoute>
-          } 
+          }
         />
 
         {/* Public authentication routes */}
-        <Route 
-          path="/login" 
+        <Route
+          path="/login"
           element={
             <PublicRoute>
               <Login />
             </PublicRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/signup" 
+
+        <Route
+          path="/signup"
           element={
             <PublicRoute>
               <SignUp />
             </PublicRoute>
-          } 
+          }
         />
 
         {/* Email verification callback route */}
         <Route path="/auth/callback" element={<AuthCallback />} />
 
         {/* Protected routes wrapped in Layout */}
-        <Route 
-          path="/" 
+        <Route
+          path="/"
           element={
             <ProtectedRoute>
               <Layout />
@@ -209,16 +210,17 @@ function App() {
           <Route path="upload" element={<Upload />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="voicestudio" element={<VoiceStudio />} />
+          <Route path="teleprompter" element={<Teleprompter />} />
         </Route>
 
         {/* Catch-all: redirect unknown paths based on auth state */}
-        <Route 
-          path="*" 
+        <Route
+          path="*"
           element={
             <PublicRoute>
               <Navigate to="/login" replace />
             </PublicRoute>
-          } 
+          }
         />
       </Routes>
     </Router>
