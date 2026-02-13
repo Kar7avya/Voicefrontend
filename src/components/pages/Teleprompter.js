@@ -79,12 +79,11 @@ export default function Teleprompter() {
     <div className="vh-100 bg-dark text-white">
       {/* HEADER */}
       <div className="d-flex justify-content-between align-items-center px-4 py-2 bg-secondary">
-        <h5 className="mb-0">🎤 Teleprompter Practice</h5>
+        <h5 className="mb-0">🎤 AI Speaking Rehearsal</h5>
 
         <button
-          className={`btn btn-sm ${
-            cameraOn ? "btn-warning" : "btn-outline-light"
-          }`}
+          className={`btn btn-sm ${cameraOn ? "btn-warning" : "btn-outline-light"
+            }`}
           onClick={() => setCameraOn(prev => !prev)}
         >
           {cameraOn ? "Turn Camera Off" : "Turn Camera On"}
