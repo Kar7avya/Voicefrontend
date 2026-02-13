@@ -96,14 +96,14 @@
 //       try {
 //         setIsLoading(true);
 //         setError(null);
-        
+
 //         const authHeaders = await getAuthHeaders();
-        
+
 //         if (!authHeaders) {
 //              // Handle case where user object exists but token is stale/missing
 //              throw new Error("Session expired. Please log in again.");
 //         }
-        
+
 //         const response = await fetch(`${BACKEND_URL}/api/metadata`, {
 //           method: 'GET',
 //           headers: { 
@@ -112,7 +112,7 @@
 //             ...authHeaders 
 //           }
 //         });
-        
+
 //         if (response.status === 401 || response.status === 403) {
 //              // Server rejected the token/RLS failed, force re-login
 //              throw new Error("Access denied by the server. Your session is invalid.");
@@ -203,7 +203,7 @@
 //       if (rate > 150) return { variant: 'good', text: 'Fast', explanation: 'Speaking quickly. Consider slowing down slightly.' };
 //       return { variant: 'needs-work', text: 'Slow', explanation: 'Your pace is quite slow. Try speaking more energetically.' };
 //     };
-    
+
 //     return {
 //       totalWords,
 //       fillerWordsCount,
@@ -239,7 +239,7 @@
 //           </DashboardContainer>
 //       );
 //   }
-  
+
 //   // Show spinner while fetching data after auth check is successful
 //   if (isLoading && !dataLoaded) { 
 //       return (
@@ -252,7 +252,7 @@
 //           </DashboardContainer>
 //       );
 //   }
-  
+
 //   return (
 //     <DashboardContainer>
 //       <Header>
@@ -424,10 +424,11 @@
 
 // dashboard.js - SOPHISTICATED DESIGN VERSION
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
-import { getAuthHeaders, getCurrentUser } from './supabaseClient'; 
+import { getAuthHeaders, getCurrentUser } from './supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 // ============================================
 // KEYFRAMES
@@ -837,6 +838,175 @@ const Tip = styled.div`
 `;
 
 // ============================================
+// PROGRESS OVERVIEW STYLED COMPONENTS
+// ============================================
+
+const ProgressOverviewCard = styled(DataCard)`
+  margin-bottom: 3rem;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%);
+  }
+`;
+
+const ProgressHeader = styled.div`
+  padding: 2rem 2rem 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+`;
+
+const ProgressTitle = styled.h2`
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 0.25rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  letter-spacing: -0.01em;
+`;
+
+const ProgressSubtitle = styled.p`
+  font-size: 0.9rem;
+  color: #94a3b8;
+  margin: 0;
+`;
+
+const KPIGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  padding: 1.5rem 2rem;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const KPICard = styled.div`
+  background: ${props => {
+    if (props.$positive) return 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.06) 100%)';
+    if (props.$negative) return 'linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)';
+    return 'linear-gradient(135deg, rgba(148, 163, 184, 0.1) 0%, rgba(100, 116, 139, 0.06) 100%)';
+  }};
+  border: 1px solid ${props => {
+    if (props.$positive) return 'rgba(16, 185, 129, 0.25)';
+    if (props.$negative) return 'rgba(239, 68, 68, 0.25)';
+    return 'rgba(148, 163, 184, 0.15)';
+  }};
+  border-radius: 14px;
+  padding: 1.5rem;
+  text-align: center;
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  }
+`;
+
+const KPIValue = styled.div`
+  font-size: 2rem;
+  font-weight: 700;
+  color: ${props => {
+    if (props.$positive) return '#34d399';
+    if (props.$negative) return '#f87171';
+    return '#e2e8f0';
+  }};
+  margin-bottom: 0.35rem;
+  line-height: 1.1;
+`;
+
+const KPILabel = styled.div`
+  font-size: 0.8rem;
+  color: #94a3b8;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+`;
+
+const ChartContainer = styled.div`
+  padding: 1rem 2rem 1.5rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+`;
+
+const ChartTitle = styled.h4`
+  font-size: 1rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin: 0 0 1rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const InsightContainer = styled.div`
+  padding: 0 2rem 2rem;
+`;
+
+const InsightBox = styled.div`
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-left: 4px solid #8b5cf6;
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  font-size: 0.92rem;
+  color: #cbd5e1;
+  line-height: 1.7;
+
+  strong {
+    color: #a78bfa;
+  }
+`;
+
+const ProgressPlaceholder = styled.div`
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #94a3b8;
+
+  p {
+    font-size: 1rem;
+    margin: 0;
+  }
+`;
+
+const ProgressPlaceholderEmoji = styled.div`
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.6;
+`;
+
+const CustomTooltipWrapper = styled.div`
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+
+  .tooltip-label {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-bottom: 0.25rem;
+  }
+
+  .tooltip-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #3b82f6;
+  }
+`;
+
+// ============================================
 // COMPONENT
 // ============================================
 function Dashboard() {
@@ -844,8 +1014,8 @@ function Dashboard() {
   const [metadataList, setMetadataList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [user, setUser] = useState(null); 
-  const [authChecked, setAuthChecked] = useState(false); 
+  const [user, setUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://voicebackend-20.onrender.com';
@@ -872,30 +1042,30 @@ function Dashboard() {
     if (!user) {
       setError("You must be logged in to view your dashboard.");
       setIsLoading(false);
-      setTimeout(() => navigate('/login'), 1500); 
-      return; 
+      setTimeout(() => navigate('/login'), 1500);
+      return;
     }
 
     const fetchMetadata = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        
+
         const authHeaders = await getAuthHeaders();
-        
+
         if (!authHeaders) {
           throw new Error("Session expired. Please log in again.");
         }
-        
+
         const response = await fetch(`${BACKEND_URL}/api/metadata`, {
           method: 'GET',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            ...authHeaders 
+            ...authHeaders
           }
         });
-        
+
         if (response.status === 401 || response.status === 403) {
           throw new Error("Access denied by the server. Your session is invalid.");
         }
@@ -937,14 +1107,14 @@ function Dashboard() {
     };
 
     fetchMetadata();
-  }, [BACKEND_URL, authChecked, user, dataLoaded, navigate]); 
+  }, [BACKEND_URL, authChecked, user, dataLoaded, navigate]);
 
   const analyzePerformance = (item) => {
     let fillerWordsCount = 0;
     let pausesCount = 0;
     let wordsArray = [];
     let videoDuration = 0; // in seconds
-    
+
     // Extract words array from deepgram_words
     if (item.deepgram_words) {
       if (Array.isArray(item.deepgram_words)) {
@@ -955,13 +1125,13 @@ function Dashboard() {
         wordsArray = item.deepgram_words;
       }
     }
-    
+
     // Calculate video duration from words (if available)
     if (wordsArray.length > 0) {
       const lastWord = wordsArray[wordsArray.length - 1];
       videoDuration = lastWord.end || lastWord.start || 0;
     }
-    
+
     // Expanded filler words list
     const fillerWords = [
       'uh', 'um', 'uhm', 'er', 'ah',
@@ -972,32 +1142,32 @@ function Dashboard() {
       'i mean', 'i guess', 'i think',
       'you see', 'see', 'look'
     ];
-    
+
     // Count filler words - check multiple word properties
     // Deepgram words structure: { word: "hello", start: 0.5, end: 0.8, ... }
     fillerWordsCount = wordsArray.filter(word => {
       // Try different possible property names for the word text
       const wordText = (
-        word.word || 
-        word.punctuated_word || 
-        word.text || 
+        word.word ||
+        word.punctuated_word ||
+        word.text ||
         (typeof word === 'string' ? word : '')
       ).toLowerCase().trim();
-      
+
       if (!wordText) return false;
-      
+
       // Remove punctuation for better matching
       const cleanWord = wordText.replace(/[.,!?;:]/g, '');
-      
+
       // Check exact matches first
       if (fillerWords.includes(cleanWord)) return true;
-      
+
       // Check if word contains filler (for compound fillers like "you know")
       // But only for multi-word fillers to avoid false positives
       const multiWordFillers = ['you know', 'you know what', 'i mean', 'i guess', 'i think', 'kind of', 'sort of'];
       return multiWordFillers.some(filler => cleanWord.includes(filler));
     }).length;
-    
+
     // Count pauses from transcript
     if (item.deepgram_transcript) {
       const pauses = item.deepgram_transcript.match(/\[PAUSE:[^\]]+\]/g);
@@ -1005,15 +1175,15 @@ function Dashboard() {
         pausesCount = pauses.length;
       }
     }
-    
+
     // Calculate total words (exclude pause markers from transcript if counting from transcript)
     const totalWords = wordsArray.length;
-    
+
     // Calculate fluency score (percentage of non-filler words)
-    const fluencyScore = totalWords > 0 
-      ? Math.round(((totalWords - fillerWordsCount) / totalWords) * 100) 
+    const fluencyScore = totalWords > 0
+      ? Math.round(((totalWords - fillerWordsCount) / totalWords) * 100)
       : 0;
-    
+
     // Calculate speaking rate (Words Per Minute)
     // WPM = (total words / duration in minutes)
     let speakingRate = 0;
@@ -1031,7 +1201,7 @@ function Dashboard() {
         // Can't calculate without duration - leave as 0
         speakingRate = 0;
       }
-    } 
+    }
 
     const getFluencyRating = (score) => {
       if (score >= 90) return { variant: 'excellent', text: 'Excellent', explanation: 'Your speech is clear with minimal filler words!' };
@@ -1056,7 +1226,7 @@ function Dashboard() {
       if (rate > 180) return { variant: 'good', text: 'Fast', explanation: 'Speaking quickly. Consider slowing down slightly.' };
       return { variant: 'needs-work', text: 'Slow', explanation: 'Your pace is quite slow. Try speaking more energetically.' };
     };
-    
+
     return {
       totalWords,
       fillerWordsCount,
@@ -1080,6 +1250,94 @@ function Dashboard() {
     }
   };
 
+  // ============================================
+  // SECTION: SORT DATA FOR TREND
+  // ============================================
+  const sortedMetadata = useMemo(() => {
+    if (!metadataList || metadataList.length === 0) return [];
+    return [...metadataList].sort((a, b) => {
+      const dateA = new Date(a.created_at || 0);
+      const dateB = new Date(b.created_at || 0);
+      return dateA - dateB; // oldest first
+    });
+  }, [metadataList]);
+
+  // ============================================
+  // SECTION: BUILD PROGRESS DATASET
+  // ============================================
+  const progressData = useMemo(() => {
+    return sortedMetadata.map((item, index) => {
+      const analysis = analyzePerformance(item);
+      const sessionDate = item.created_at
+        ? new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : `Session ${index + 1}`;
+      return {
+        session: index + 1,
+        label: sessionDate,
+        fluencyScore: analysis.fluencyScore,
+        fillerWordsCount: analysis.fillerWordsCount,
+        speakingRate: analysis.speakingRate,
+      };
+    });
+  }, [sortedMetadata]);
+
+  // ============================================
+  // SECTION: CALCULATE IMPROVEMENT DELTA
+  // ============================================
+  const progressDelta = useMemo(() => {
+    if (progressData.length < 2) {
+      return { fluencyChange: 0, fillerChange: 0, rateChange: 0, insightText: '' };
+    }
+    const first = progressData[0];
+    const latest = progressData[progressData.length - 1];
+
+    const fluencyChange = Math.round(latest.fluencyScore - first.fluencyScore);
+    const fillerChange = latest.fillerWordsCount - first.fillerWordsCount;
+    const rateChange = latest.speakingRate - first.speakingRate;
+
+    // Build dynamic coaching insight
+    const parts = [];
+    if (fluencyChange > 0) {
+      parts.push(`Your fluency improved by ${fluencyChange}% across ${progressData.length} sessions.`);
+    } else if (fluencyChange < 0) {
+      parts.push(`Your fluency decreased by ${Math.abs(fluencyChange)}% across ${progressData.length} sessions. Don't worry — focus on reducing filler words.`);
+    } else {
+      parts.push(`Your fluency has remained steady across ${progressData.length} sessions.`);
+    }
+
+    if (fillerChange < 0) {
+      parts.push(`You are reducing filler words steadily (${Math.abs(fillerChange)} fewer).`);
+    } else if (fillerChange > 0) {
+      parts.push(`Filler word usage increased by ${fillerChange}. Try pausing instead of saying "um" or "uh".`);
+    } else {
+      parts.push('Filler word count is consistent.');
+    }
+
+    if (rateChange !== 0 && latest.speakingRate > 0 && first.speakingRate > 0) {
+      parts.push('Keep practicing pacing consistency.');
+    }
+
+    return {
+      fluencyChange,
+      fillerChange,
+      rateChange,
+      insightText: parts.join(' '),
+    };
+  }, [progressData]);
+
+  // Custom tooltip for the chart
+  const CustomChartTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <CustomTooltipWrapper>
+          <div className="tooltip-label">{payload[0]?.payload?.label || `Session ${label}`}</div>
+          <div className="tooltip-value">{payload[0].value.toFixed(0)}% Fluency</div>
+        </CustomTooltipWrapper>
+      );
+    }
+    return null;
+  };
+
   // 3. Render Logic based on Auth and Loading States
   if (!authChecked) {
     return (
@@ -1096,8 +1354,8 @@ function Dashboard() {
       </DashboardContainer>
     );
   }
-  
-  if (isLoading && !dataLoaded) { 
+
+  if (isLoading && !dataLoaded) {
     return (
       <DashboardContainer>
         <Header>
@@ -1112,7 +1370,7 @@ function Dashboard() {
       </DashboardContainer>
     );
   }
-  
+
   return (
     <DashboardContainer>
       <Header>
@@ -1137,6 +1395,96 @@ function Dashboard() {
 
         {!error && (
           <>
+            {/* ============================================ */}
+            {/* SECTION: PROGRESS OVERVIEW UI                */}
+            {/* ============================================ */}
+            {metadataList.length > 0 && (
+              <ProgressOverviewCard>
+                <ProgressHeader>
+                  <ProgressTitle>📈 Your Progress Overview</ProgressTitle>
+                  <ProgressSubtitle>Track your speaking improvement across all sessions</ProgressSubtitle>
+                </ProgressHeader>
+
+                {metadataList.length < 2 ? (
+                  <ProgressPlaceholder>
+                    <ProgressPlaceholderEmoji>📊</ProgressPlaceholderEmoji>
+                    <p>Upload at least 2 presentations to see progress trends.</p>
+                  </ProgressPlaceholder>
+                ) : (
+                  <>
+                    {/* A) KPI Summary Cards */}
+                    <KPIGrid>
+                      <KPICard $positive={progressDelta.fluencyChange > 0} $negative={progressDelta.fluencyChange < 0}>
+                        <KPIValue $positive={progressDelta.fluencyChange > 0} $negative={progressDelta.fluencyChange < 0}>
+                          {progressDelta.fluencyChange > 0 ? '+' : ''}{progressDelta.fluencyChange}%
+                        </KPIValue>
+                        <KPILabel>Fluency Change</KPILabel>
+                      </KPICard>
+
+                      <KPICard $positive={progressDelta.fillerChange < 0} $negative={progressDelta.fillerChange > 0}>
+                        <KPIValue $positive={progressDelta.fillerChange < 0} $negative={progressDelta.fillerChange > 0}>
+                          {progressDelta.fillerChange <= 0 ? '' : '+'}{progressDelta.fillerChange}
+                        </KPIValue>
+                        <KPILabel>Filler Words Change</KPILabel>
+                      </KPICard>
+
+                      <KPICard
+                        $positive={progressDelta.rateChange !== 0 && progressData[progressData.length - 1]?.speakingRate >= 120 && progressData[progressData.length - 1]?.speakingRate <= 180}
+                        $negative={progressData[progressData.length - 1]?.speakingRate > 0 && (progressData[progressData.length - 1]?.speakingRate < 100 || progressData[progressData.length - 1]?.speakingRate > 200)}
+                      >
+                        <KPIValue
+                          $positive={progressDelta.rateChange !== 0 && progressData[progressData.length - 1]?.speakingRate >= 120 && progressData[progressData.length - 1]?.speakingRate <= 180}
+                          $negative={progressData[progressData.length - 1]?.speakingRate > 0 && (progressData[progressData.length - 1]?.speakingRate < 100 || progressData[progressData.length - 1]?.speakingRate > 200)}
+                        >
+                          {progressDelta.rateChange > 0 ? '+' : ''}{progressDelta.rateChange !== 0 ? progressDelta.rateChange : '—'}
+                        </KPIValue>
+                        <KPILabel>Speaking Rate Change</KPILabel>
+                      </KPICard>
+                    </KPIGrid>
+
+                    {/* B) Fluency Trend LineChart */}
+                    <ChartContainer>
+                      <ChartTitle>📉 Fluency Trend</ChartTitle>
+                      <ResponsiveContainer width="100%" height={220}>
+                        <LineChart data={progressData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" />
+                          <XAxis
+                            dataKey="label"
+                            tick={{ fill: '#94a3b8', fontSize: 12 }}
+                            axisLine={{ stroke: 'rgba(148,163,184,0.15)' }}
+                            tickLine={false}
+                          />
+                          <YAxis
+                            domain={[0, 100]}
+                            tick={{ fill: '#94a3b8', fontSize: 12 }}
+                            axisLine={{ stroke: 'rgba(148,163,184,0.15)' }}
+                            tickLine={false}
+                            width={40}
+                          />
+                          <Tooltip content={<CustomChartTooltip />} />
+                          <Line
+                            type="monotone"
+                            dataKey="fluencyScore"
+                            stroke="#3b82f6"
+                            strokeWidth={2.5}
+                            dot={{ r: 5, fill: '#3b82f6', stroke: '#1e293b', strokeWidth: 2 }}
+                            activeDot={{ r: 7, fill: '#60a5fa', stroke: '#1e293b', strokeWidth: 2 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+
+                    {/* C) Insight Box */}
+                    <InsightContainer>
+                      <InsightBox>
+                        <strong>💡 Coach Insight:</strong> {progressDelta.insightText}
+                      </InsightBox>
+                    </InsightContainer>
+                  </>
+                )}
+              </ProgressOverviewCard>
+            )}
+
             {metadataList.length > 0 ? (
               metadataList.map(item => {
                 const analysis = analyzePerformance(item);
@@ -1146,20 +1494,20 @@ function Dashboard() {
                     <CardHeader>
                       <CardTitle>🎥 {item.original_name || item.video_name || 'Untitled Presentation'}</CardTitle>
                       <CardSubtitle>Uploaded on {formatDate(item.created_at)}</CardSubtitle>
-                      
+
                       <ScoreSection>
                         <ScoreCard variant={analysis.fluencyRating.variant}>
                           <ScoreValue>{analysis.fluencyScore.toFixed(0)}%</ScoreValue>
                           <ScoreLabel>Speech Clarity</ScoreLabel>
                           <ScoreExplanation>{analysis.fluencyRating.explanation}</ScoreExplanation>
                         </ScoreCard>
-                        
+
                         <ScoreCard variant={analysis.paceRating.variant}>
                           <ScoreValue>{analysis.speakingRate > 0 ? analysis.speakingRate : 'N/A'}</ScoreValue>
                           <ScoreLabel>Words Per Minute</ScoreLabel>
                           <ScoreExplanation>{analysis.paceRating.explanation}</ScoreExplanation>
                         </ScoreCard>
-                        
+
                         <ScoreCard variant={analysis.fillerRating.variant}>
                           <ScoreValue>{analysis.fillerWordsCount}</ScoreValue>
                           <ScoreLabel>Filler Words Used</ScoreLabel>
@@ -1192,10 +1540,10 @@ function Dashboard() {
 
                       <div>
                         <SectionTitle>📊 Your Performance Breakdown</SectionTitle>
-                        
+
                         <InfoBox>
                           <InfoText>
-                            <strong>What do these numbers mean?</strong><br/>
+                            <strong>What do these numbers mean?</strong><br />
                             We analyzed your presentation to help you understand your speaking patterns and give you actionable tips for improvement.
                           </InfoText>
                         </InfoBox>
@@ -1224,26 +1572,26 @@ function Dashboard() {
                           <BlockTitle>📈 Quick Stats</BlockTitle>
                           <BlockContent style={{ display: 'grid', gap: '0.75rem' }}>
                             <div>✅ <strong>Total Words Spoken:</strong> {analysis.totalWords || 0}</div>
-                            <div>⚠️ <strong>Filler Words Used:</strong> {analysis.fillerWordsCount || 0} 
+                            <div>⚠️ <strong>Filler Words Used:</strong> {analysis.fillerWordsCount || 0}
                               {analysis.fillerWordsCount > 0 && (
-                                <span style={{ fontSize: '0.85em', opacity: 0.7 }}> 
+                                <span style={{ fontSize: '0.85em', opacity: 0.7 }}>
                                   ({((analysis.fillerWordsCount / analysis.totalWords) * 100).toFixed(1)}% of total words)
                                 </span>
                               )}
                               {analysis.fillerWordsCount === 0 && analysis.totalWords > 0 && (
-                                <span style={{ fontSize: '0.85em', opacity: 0.7, color: '#4ade80' }}> 
+                                <span style={{ fontSize: '0.85em', opacity: 0.7, color: '#4ade80' }}>
                                   (Excellent! No filler words detected)
                                 </span>
                               )}
                             </div>
-                            <div>⏸️ <strong>Speech Pauses:</strong> {analysis.pausesCount || 0} 
+                            <div>⏸️ <strong>Speech Pauses:</strong> {analysis.pausesCount || 0}
                               {analysis.pausesCount > 0 && (
-                                <span style={{ fontSize: '0.85em', opacity: 0.7 }}> 
+                                <span style={{ fontSize: '0.85em', opacity: 0.7 }}>
                                   (Natural breaks in your speech)
                                 </span>
                               )}
                               {analysis.pausesCount === 0 && analysis.totalWords > 0 && (
-                                <span style={{ fontSize: '0.85em', opacity: 0.7 }}> 
+                                <span style={{ fontSize: '0.85em', opacity: 0.7 }}>
                                   (Smooth, continuous speech)
                                 </span>
                               )}
@@ -1269,9 +1617,9 @@ function Dashboard() {
                               <KeyframesGrid>
                                 {item.frames.map((frame, index) => (
                                   <a key={index} href={frame.frame_url || frame.url} target="_blank" rel="noopener noreferrer">
-                                    <FrameImage 
-                                      src={frame.frame_url || frame.url} 
-                                      alt={`Moment ${index + 1} from your presentation`} 
+                                    <FrameImage
+                                      src={frame.frame_url || frame.url}
+                                      alt={`Moment ${index + 1} from your presentation`}
                                       title={`Click to view full size - Moment ${index + 1}`}
                                     />
                                   </a>
