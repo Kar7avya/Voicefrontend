@@ -247,7 +247,6 @@ function scoreLabel(score) {
 //   Called during JSX rendering of each line in practice mode.
 //
 function renderTaggedLine(text, lineIndex, currentLine, currentWord) {
-  // Split the text around tags, keeping the tags in the result
   const tagPattern = /(\[PAUSE\]|\[SLOW\]|\[FAST\]|\[EMPHASIZE\])/g;
   const segments = text.split(tagPattern);
 
@@ -255,7 +254,6 @@ function renderTaggedLine(text, lineIndex, currentLine, currentWord) {
   const elements = [];
 
   segments.forEach((segment, segIdx) => {
-    // Check if this segment is a tag
     const tagMatch = segment.match(/^\[(PAUSE|SLOW|FAST|EMPHASIZE)\]$/);
     if (tagMatch) {
       const tagType = tagMatch[1].toLowerCase();
@@ -265,7 +263,6 @@ function renderTaggedLine(text, lineIndex, currentLine, currentWord) {
         </span>
       );
     } else {
-      // Regular text — split into words for highlighting
       const words = segment.match(/\w+|[.,!?;:'"()-]/g) || [];
       words.forEach((word, wIdx) => {
         const globalWordIdx = wordCounter;
@@ -275,8 +272,8 @@ function renderTaggedLine(text, lineIndex, currentLine, currentWord) {
             key={`word-${segIdx}-${wIdx}`}
             className={
               lineIndex === currentLine && globalWordIdx === currentWord
-                ? "fw-bold text-warning"
-                : "opacity-50"
+                ? "tp-word-active"
+                : "tp-word-dim"
             }
             style={{ marginRight: /\w+/.test(word) ? 6 : 2 }}
           >
@@ -649,26 +646,26 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
   // ============================================
 
   return (
-    <div className="card bg-dark text-white p-4" style={{ maxWidth: 700, width: "100%" }}>
+    <div className="tp-card">
 
-      {/* --- MODE SWITCHER BAR --- */}
+      {/* --- MODE SWITCHER TABS --- */}
       <div className="teleprompter-mode-bar">
         <button
-          className={`btn btn-sm ${viewMode === "edit" ? "active-mode" : "btn-outline-light"}`}
+          className={`btn btn-sm ${viewMode === "edit" ? "active-mode" : ""}`}
           onClick={() => setViewMode("edit")}
           disabled={isRunning}
         >
-          ✏️ Edit Script
+          ✏️ Edit
         </button>
         <button
-          className={`btn btn-sm ${viewMode === "review" ? "active-mode" : "btn-outline-light"}`}
+          className={`btn btn-sm ${viewMode === "review" ? "active-mode" : ""}`}
           onClick={() => setViewMode("review")}
           disabled={!enhancedData || isRunning}
         >
           📊 Review
         </button>
         <button
-          className={`btn btn-sm ${viewMode === "practice" ? "active-mode" : "btn-outline-light"}`}
+          className={`btn btn-sm ${viewMode === "practice" ? "active-mode" : ""}`}
           onClick={() => setViewMode("practice")}
           disabled={isRunning}
         >
@@ -677,32 +674,25 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
       </div>
 
       {/* ============================================
-          SECTION 4: LOADING + ERROR STATE MANAGEMENT
-          ============================================
-          Shows a spinner overlay when the AI is processing.
-          Shows an error alert if something went wrong.
-          Disables interactive elements during loading.
+          SECTION 4: LOADING + ERROR STATE
           ============================================ */}
 
-      {/* Loading Spinner */}
+      {/* Cinematic Loading Spinner */}
       {isEnhancing && (
-        <div className="teleprompter-spinner-overlay mb-3">
-          <div className="spinner-border text-info" role="status">
-            <span className="visually-hidden">Enhancing script...</span>
-          </div>
-          <p>✨ AI is enhancing your script...</p>
-          <p style={{ fontSize: "0.8rem", color: "#718096" }}>
-            This may take 10-20 seconds
-          </p>
+        <div className="teleprompter-spinner-overlay">
+          <div className="tp-spinner"></div>
+          <p className="tp-spinner-text">Enhancing your script…</p>
+          <p className="tp-spinner-sub">AI is analyzing structure, flow & delivery — 10-20s</p>
         </div>
       )}
 
       {/* Error Alert */}
       {enhanceError && (
         <div className="teleprompter-error">
-          <strong>⚠️ Enhancement Error:</strong> {enhanceError}
+          <span>⚠️</span>
+          <span><strong>Enhancement Error:</strong> {enhanceError}</span>
           <button
-            className="btn btn-sm btn-outline-light ms-3"
+            className="tp-error-dismiss"
             onClick={() => setEnhanceError(null)}
           >
             Dismiss
@@ -711,32 +701,23 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
       )}
 
       {/* ============================================
-          EDIT MODE — Script Input
+          EDIT MODE
           ============================================ */}
       {viewMode === "edit" && !isEnhancing && (
-        <>
-          {/* SECTION 2: SCRIPT INPUT — Textarea */}
+        <div className="tp-fade-in">
           <textarea
-            className="form-control mb-3"
+            className="tp-textarea"
             rows={6}
             value={originalScript}
             onChange={e => {
               setOriginalScript(e.target.value);
-              // Reset enhancement when script changes
               setEnhancedData(null);
             }}
             disabled={isRunning}
-            placeholder="Paste or type your speech script here..."
-            style={{
-              background: "rgba(255,255,255,0.05)",
-              color: "#e2e8f0",
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: "10px",
-              resize: "vertical"
-            }}
+            placeholder="Paste or type your speech script here…"
           />
 
-          {/* SECTION 2: SCRIPT INPUT — File Upload */}
+          {/* File Upload */}
           <div
             className="teleprompter-upload-zone"
             onClick={() => fileInputRef.current?.click()}
@@ -747,20 +728,20 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
               ref={fileInputRef}
               onChange={handleFileUpload}
             />
-            <span style={{ fontSize: "1.2rem" }}>📄</span>
-            <p className="mb-0 mt-1" style={{ fontSize: "0.85rem", color: "#a0aec0" }}>
+            <span className="tp-upload-icon">📄</span>
+            <p className="tp-upload-label">
               Click to upload a .txt script file
             </p>
           </div>
 
-          {/* CTA: Enhance Script */}
+          {/* CTA Buttons */}
           <div className="d-flex gap-2 mb-3">
             <button
               className="btn btn-enhance flex-grow-1"
               onClick={handleEnhance}
               disabled={isEnhancing || !originalScript.trim()}
             >
-              ✨ Enhance Script
+              ✨ Enhance with AI
             </button>
             <button
               className="btn btn-practice"
@@ -770,23 +751,16 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
               🎯 Quick Practice
             </button>
           </div>
-        </>
+        </div>
       )}
 
       {/* ============================================
-          SECTION 6: ENHANCED SCRIPT DISPLAY PANELS
-          ============================================
-          Renders four panels showing the Gemini enhancement:
-          - Enhanced teleprompter text (with modulation tags)
-          - Key points extracted from the script
-          - Memory anchors for recall
-          - Flow structure (logical sections)
-          - Modulation notes (delivery tips)
+          REVIEW MODE — Enhanced Panels
           ============================================ */}
       {viewMode === "review" && enhancedData && !isEnhancing && (
-        <>
-          {/* Enhanced Script Text */}
-          <div className="teleprompter-enhance-panel">
+        <div className="tp-fade-in">
+          {/* Enhanced Script */}
+          <div className="teleprompter-enhance-panel tp-panel-script">
             <h6>📝 Enhanced Script</h6>
             <div className="teleprompter-enhanced-text">
               {enhancedData.enhanced_script}
@@ -794,50 +768,52 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
           </div>
 
           {/* Key Points */}
-          <div className="teleprompter-enhance-panel">
+          <div className="teleprompter-enhance-panel tp-panel-points">
             <h6>🎯 Key Points</h6>
             <ul>
               {enhancedData.key_points.map((point, i) => (
-                <li key={i}>• {point}</li>
+                <li key={i}>{point}</li>
               ))}
             </ul>
           </div>
 
           {/* Memory Anchors */}
-          <div className="teleprompter-enhance-panel">
+          <div className="teleprompter-enhance-panel tp-panel-memory">
             <h6>🧠 Memory Anchors</h6>
             <ul>
               {enhancedData.memory_summary.map((anchor, i) => (
-                <li key={i}>🔗 {anchor}</li>
+                <li key={i}>{anchor}</li>
               ))}
             </ul>
           </div>
 
           {/* Flow Structure */}
-          <div className="teleprompter-enhance-panel">
+          <div className="teleprompter-enhance-panel tp-panel-flow">
             <h6>📋 Flow Structure</h6>
             <ul>
               {enhancedData.flow_structure.map((section, i) => (
                 <li key={i}>
-                  <span style={{ color: "#667eea", fontWeight: 600 }}>Step {i + 1}:</span>{" "}
+                  <span style={{ color: "#a5b4fc", fontWeight: 600 }}>Step {i + 1}:</span>{" "}
                   {section}
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* Modulation Notes */}
-          <div className="teleprompter-enhance-panel">
+          {/* Delivery Tips */}
+          <div className="teleprompter-enhance-panel tp-panel-tips">
             <h6>🎙️ Delivery Tips</h6>
             <ul>
               {enhancedData.modulation_notes.map((note, i) => (
-                <li key={i}>💡 {note}</li>
+                <li key={i}>{note}</li>
               ))}
             </ul>
           </div>
 
+          <div className="tp-divider"></div>
+
           {/* CTAs */}
-          <div className="d-flex gap-2 mt-2">
+          <div className="d-flex gap-2">
             <button
               className="btn btn-edit"
               onClick={() => setViewMode("edit")}
@@ -851,48 +827,38 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
               🎯 Start Practice
             </button>
           </div>
-        </>
+        </div>
       )}
 
       {/* ============================================
-          SECTION 7: TELEPROMPTER PRACTICE MODE
-          ============================================
-          Uses the enhanced script (if available) or original script.
-          Recognizes and visually styles modulation tags:
-            [PAUSE]     → Yellow pulsing badge
-            [SLOW]      → Teal badge
-            [FAST]      → Orange badge
-            [EMPHASIZE] → Red badge
-          Word-by-word highlighting is preserved from the original code.
+          PRACTICE MODE
           ============================================ */}
       {viewMode === "practice" && !isEnhancing && (
-        <div className={isRunning ? "teleprompter-practice-active" : ""}>
+        <div className={isRunning ? "teleprompter-practice-active" : "tp-fade-in"}>
 
           {/* Teleprompter Display */}
-          <div className="fs-4 mb-3" style={{ lineHeight: 1.9 }}>
+          <div className="tp-practice-display">
             {taggedLines.map((line, i) => {
               const isProblem = problemLinesUI.some(p => p.text === line);
 
-              // If we have enhanced data with tags, render with tag styling
               if (enhancedData && viewMode === "practice") {
                 return (
-                  <div key={i} className={isProblem ? "text-danger" : ""}>
+                  <div key={i} style={isProblem ? { color: "#f87171" } : {}}>
                     {renderTaggedLine(line, i, currentLine, currentWord)}
                   </div>
                 );
               }
 
-              // Fallback: Original rendering for non-enhanced scripts
               const tokens = line.match(/\w+|[.,!?]/g) || [];
               return (
-                <div key={i} className={isProblem ? "text-danger" : ""}>
+                <div key={i} style={isProblem ? { color: "#f87171" } : {}}>
                   {tokens.map((t, idx) => (
                     <span
                       key={idx}
                       className={
                         i === currentLine && idx === currentWord
-                          ? "fw-bold text-warning"
-                          : "opacity-50"
+                          ? "tp-word-active"
+                          : "tp-word-dim"
                       }
                       style={{ marginRight: /\w+/.test(t) ? 6 : 2 }}
                     >
@@ -907,14 +873,14 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
           {/* Practice Controls */}
           <div className="d-flex gap-2 mb-3">
             <button
-              className="btn btn-success"
+              className="tp-btn-start"
               onClick={startSession}
               disabled={isRunning}
             >
               ▶ Start
             </button>
             <button
-              className="btn btn-danger"
+              className="tp-btn-stop"
               onClick={stopSession}
               disabled={!isRunning}
             >
@@ -927,7 +893,7 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
                 setViewMode("edit");
               }}
             >
-              ✏️ Edit Script
+              ✏️ Edit
             </button>
             {enhancedData && (
               <button
@@ -942,36 +908,32 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
             )}
           </div>
 
-          {/* ===== DAY 1 FEEDBACK PANEL (PRESERVED) ===== */}
+          {/* ===== SESSION SCORE CARD (PREMIUM) ===== */}
           {sessionScoreUI !== null && (
-            <div className="card bg-secondary mt-4 p-3">
-              <h4>
-                Session Score: {sessionScoreUI}{" "}
-                <span className="badge bg-dark ms-2">
+            <div className="tp-score-card">
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span className="tp-score-value">{sessionScoreUI}</span>
+                <span className={`tp-score-label ${sessionScoreUI >= 85 ? "excellent" :
+                    sessionScoreUI >= 65 ? "good" : "needs-work"
+                  }`}>
                   {scoreLabel(sessionScoreUI)}
                 </span>
-              </h4>
-              <p>{coachingText}</p>
+              </div>
+              <p className="tp-coaching-text">{coachingText}</p>
 
-              {/* ===== DAY 2 PACE TIMELINE (PRESERVED) ===== */}
-              <h6>Pace Timeline</h6>
-              <div className="d-flex gap-2">
-                {timelineData.map((s, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      width: 32,
-                      height: 16,
-                      borderRadius: 4,
-                      backgroundColor:
-                        s === "normal"
-                          ? "#28a745"
-                          : s === "rushed"
-                            ? "#ffc107"
-                            : "#dc3545"
-                    }}
-                  />
-                ))}
+              {/* Pace Timeline */}
+              <div style={{ marginTop: "1rem" }}>
+                <h6 style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#94a3b8", fontWeight: 700, marginBottom: "0.5rem" }}>
+                  Pace Timeline
+                </h6>
+                <div className="tp-timeline-bar">
+                  {timelineData.map((s, i) => (
+                    <div
+                      key={i}
+                      className={`tp-timeline-segment ${s}`}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           )}

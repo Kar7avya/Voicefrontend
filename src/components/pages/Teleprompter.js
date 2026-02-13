@@ -13,13 +13,11 @@ export default function Teleprompter() {
 
   // START VIDEO RECORDING
   const startVideoRecording = () => {
-    // 1️⃣ Stream must exist
     if (!cameraStream) {
       console.error("No camera stream yet");
       return;
     }
 
-    // 2️⃣ Stream must have live tracks
     const tracks = cameraStream.getTracks();
     const liveTracks = tracks.filter(t => t.readyState === "live");
 
@@ -28,13 +26,11 @@ export default function Teleprompter() {
       return;
     }
 
-    // 3️⃣ Prevent double start
     if (recorderRef.current?.state === "recording") {
       console.warn("Recording already in progress");
       return;
     }
 
-    // 4️⃣ Pick supported mime type
     let options = {};
     if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")) {
       options.mimeType = "video/webm;codecs=vp8,opus";
@@ -45,7 +41,6 @@ export default function Teleprompter() {
       return;
     }
 
-    // 5️⃣ Create recorder
     const recorder = new MediaRecorder(cameraStream, options);
     recorderRef.current = recorder;
     chunksRef.current = [];
@@ -76,25 +71,29 @@ export default function Teleprompter() {
   };
 
   return (
-    <div className="vh-100 bg-dark text-white">
-      {/* HEADER */}
-      <div className="d-flex justify-content-between align-items-center px-4 py-2 bg-secondary">
-        <h5 className="mb-0">🎤 AI Speaking Rehearsal</h5>
+    <div className="tp-page">
+      {/* PREMIUM HEADER */}
+      <div className="tp-header">
+        <div className="tp-header-title">
+          <span className="tp-logo-icon">🎤</span>
+          AI Speaking Rehearsal
+          <span className="tp-header-badge">AI Beta</span>
+        </div>
 
         <button
-          className={`btn btn-sm ${cameraOn ? "btn-warning" : "btn-outline-light"
-            }`}
+          className={`tp-camera-btn ${cameraOn ? "active" : ""}`}
           onClick={() => setCameraOn(prev => !prev)}
         >
-          {cameraOn ? "Turn Camera Off" : "Turn Camera On"}
+          {cameraOn ? (
+            <><span className="tp-recording-dot"></span> Camera On</>
+          ) : (
+            "📷 Turn On Camera"
+          )}
         </button>
       </div>
 
       {/* CAMERA + PROMPTER */}
-      <div
-        className="position-relative w-100"
-        style={{ height: "calc(100vh - 48px)" }}
-      >
+      <div className="tp-content position-relative w-100">
         {cameraOn && (
           <CameraPreview onStreamReady={setCameraStream} />
         )}
@@ -110,11 +109,11 @@ export default function Teleprompter() {
 
       {/* VIDEO PLAYBACK */}
       {videoURL && (
-        <div className="bg-dark text-center py-3">
+        <div className="tp-playback-card">
           <video
             src={videoURL}
             controls
-            style={{ width: "320px", borderRadius: "8px" }}
+            style={{ width: "360px" }}
           />
         </div>
       )}
