@@ -148,7 +148,7 @@ function validateResponse(data) {
 // ============================================
 //
 // This section handles:
-//   1. Missing API key — tells the user to configure huggingface
+//   1. Missing API key — tells the user to configure REACT_APP_HUGGINGFACE_API_KEY
 //   2. Network failures — wraps fetch errors with user-friendly messages
 //   3. Malformed AI response — catches JSON.parse failures and provides
 //      the raw text for debugging
@@ -191,10 +191,10 @@ export async function enhanceScriptWithGemini(script) {
     }
 
     // ── Guard: API key ──
-    const apiKey = process.env.huggingface;
+    const apiKey = process.env.REACT_APP_HUGGINGFACE_API_KEY;
     if (!apiKey) {
         throw new Error(
-            "Gemini API key not found. Please add huggingface to your .env file and restart the dev server."
+            "Gemini API key not found. Please add REACT_APP_HUGGINGFACE_API_KEY to your .env file and restart the dev server."
         );
     }
 
