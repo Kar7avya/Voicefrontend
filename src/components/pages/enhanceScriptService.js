@@ -1,9 +1,9 @@
 // ============================================
-// ENHANCE SCRIPT SERVICE — Gemini AI Integration
+// ENHANCE SCRIPT SERVICE — Groq AI Integration
 // ============================================
 //
 // WHAT THIS MODULE DOES:
-//   Sends a user's speech script to Google Gemini AI and receives
+//   Sends a user's speech script to Groq AI and receives
 //   a structured enhancement including improved text, key points,
 //   memory anchors, flow structure, and modulation notes.
 //
@@ -18,18 +18,22 @@
 //   Returns a structured object or throws a descriptive error.
 //
 
-import { GoogleGenAI } from "@google/genai";
+// ============================================
+// GROQ API CONFIGURATION
+// ============================================
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 // ============================================
-// GEMINI PROMPT SECTION
+// GROQ PROMPT SECTION
 // ============================================
 //
-// WHAT IS SENT TO GEMINI:
+// WHAT IS SENT TO GROQ:
 //   The user's raw speech/presentation script as plain text.
 //
 // WHY THIS PROMPT STRUCTURE:
 //   - We explicitly request JSON-only output (no markdown fences)
-//   - We define the exact schema Gemini must follow
+//   - We define the exact schema the model must follow
 //   - We include modulation tags ([PAUSE], [SLOW], [FAST], [EMPHASIZE])
 //     so the enhanced script can drive visual cues in the teleprompter
 //   - We ask for key_points, memory_summary, flow_structure, and
@@ -39,21 +43,21 @@ import { GoogleGenAI } from "@google/genai";
 // and ensure the AI returns parseable structured data.
 
 /**
- * buildPrompt — Constructs the Gemini prompt for script enhancement.
+ * buildPrompt — Constructs the prompt for script enhancement.
  *
  * WHAT THIS FUNCTION DOES:
  *   Wraps the user's script inside a carefully engineered prompt
- *   that instructs Gemini to return structured JSON.
+ *   that instructs the model to return structured JSON.
  *
  * WHY IT EXISTS:
  *   Centralizes prompt logic so it can be tuned independently
  *   of the API call mechanism.
  *
  * WHEN IT RUNS:
- *   Called internally by enhanceScriptWithGemini() before the API call.
+ *   Called internally by enhanceScriptWithGroq() before the API call.
  *
  * @param {string} script — The user's raw script text
- * @returns {string} — The full prompt string to send to Gemini
+ * @returns {string} — The full prompt string to send to Groq
  */
 function buildPrompt(script) {
     return `You are an expert speech coach and communication strategist.
@@ -95,7 +99,7 @@ Remember: Return ONLY the JSON object. Nothing else.`;
 // RESPONSE VALIDATION SECTION
 // ============================================
 //
-// After Gemini responds, we must verify:
+// After the model responds, we must verify:
 //   1. The response is valid JSON (not markdown or prose)
 //   2. All required keys exist
 //   3. Each key has the correct type (string or string[])
@@ -104,7 +108,7 @@ Remember: Return ONLY the JSON object. Nothing else.`;
 // than letting malformed data propagate into the UI.
 
 /**
- * validateResponse — Ensures the Gemini response matches our expected schema.
+ * validateResponse — Ensures the AI response matches our expected schema.
  *
  * WHAT THIS FUNCTION DOES:
  *   Checks that the parsed JSON has all required fields with correct types.
@@ -114,7 +118,7 @@ Remember: Return ONLY the JSON object. Nothing else.`;
  *   data from reaching the UI and causing render errors.
  *
  * WHEN IT RUNS:
- *   Called internally by enhanceScriptWithGemini() after JSON.parse succeeds.
+ *   Called internally by enhanceScriptWithGroq() after JSON.parse succeeds.
  *
  * @param {object} data — The parsed response object
  * @throws {Error} — If any required field is missing or has the wrong type
@@ -148,7 +152,7 @@ function validateResponse(data) {
 // ============================================
 //
 // This section handles:
-//   1. Missing API key — tells the user to configure REACT_APP_HUGGINGFACE_API_KEY
+//   1. Missing API key — tells the user to configure REACT_APP_groq_api_karthavya
 //   2. Network failures — wraps fetch errors with user-friendly messages
 //   3. Malformed AI response — catches JSON.parse failures and provides
 //      the raw text for debugging
@@ -159,10 +163,10 @@ function validateResponse(data) {
 // so the calling component can display them in the UI.
 
 /**
- * enhanceScriptWithGemini — Main entry point for script enhancement.
+ * enhanceScriptWithGroq — Main entry point for script enhancement.
  *
  * WHAT THIS FUNCTION DOES:
- *   Takes a raw script string, sends it to Google Gemini,
+ *   Takes a raw script string, sends it to Groq AI,
  *   parses and validates the response, and returns structured data.
  *
  * WHY IT EXISTS:
@@ -184,42 +188,63 @@ function validateResponse(data) {
  *   }
  * @throws {Error} — Descriptive error for any failure scenario
  */
-export async function enhanceScriptWithGemini(script) {
+export async function enhanceScriptWithGroq(script) {
     // ── Guard: Empty script ──
     if (!script || script.trim().length === 0) {
         throw new Error("Cannot enhance an empty script. Please paste or upload your script first.");
     }
 
     // ── Guard: API key ──
-    const apiKey = process.env.REACT_APP_HUGGINGFACE_API_KEY;
+    const apiKey = process.env.REACT_APP_groq_api_karthavya;
     if (!apiKey) {
         throw new Error(
-            "Gemini API key not found. Please add REACT_APP_HUGGINGFACE_API_KEY to your .env file and restart the dev server."
+            "Groq API key not found. Please add REACT_APP_groq_api_karthavya to your .env file and restart the dev server."
         );
     }
-
-    // ── Initialize Gemini client ──
-    const ai = new GoogleGenAI({ apiKey });
 
     // ── Build prompt ──
     const prompt = buildPrompt(script);
 
     try {
-        // ── API Call ──
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: prompt,
+        // ── API Call to Groq ──
+        const response = await fetch(GROQ_API_URL, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                model: GROQ_MODEL,
+                messages: [
+                    {
+                        role: "user",
+                        content: prompt,
+                    },
+                ],
+                temperature: 0.7,
+                max_tokens: 4096,
+            }),
         });
 
+        if (!response.ok) {
+            const errorBody = await response.text();
+            console.error("Groq API error response:", errorBody);
+            throw new Error(
+                `Groq API returned status ${response.status}: ${errorBody}`
+            );
+        }
+
+        const data = await response.json();
+
         // ── Extract text from response ──
-        const rawText = response.text;
+        const rawText = data.choices?.[0]?.message?.content;
 
         if (!rawText || rawText.trim().length === 0) {
-            throw new Error("Gemini returned an empty response. Please try again.");
+            throw new Error("Groq returned an empty response. Please try again.");
         }
 
         // ── Parse JSON ──
-        // Gemini sometimes wraps JSON in markdown code fences — strip them
+        // The model sometimes wraps JSON in markdown code fences — strip them
         let cleanText = rawText.trim();
         if (cleanText.startsWith("```")) {
             // Remove opening fence (```json or ```)
@@ -232,9 +257,9 @@ export async function enhanceScriptWithGemini(script) {
         try {
             parsed = JSON.parse(cleanText);
         } catch (parseError) {
-            console.error("Raw Gemini response (failed to parse):", rawText);
+            console.error("Raw Groq response (failed to parse):", rawText);
             throw new Error(
-                "Gemini returned a response that could not be parsed as JSON. " +
+                "Groq returned a response that could not be parsed as JSON. " +
                 "This usually means the AI included extra text. Please try again."
             );
         }
@@ -247,13 +272,14 @@ export async function enhanceScriptWithGemini(script) {
     } catch (error) {
         // Re-throw validation/parse errors as-is
         if (error.message.startsWith("Validation failed") ||
-            error.message.startsWith("Gemini returned") ||
+            error.message.startsWith("Groq returned") ||
+            error.message.startsWith("Groq API returned") ||
             error.message.startsWith("Cannot enhance")) {
             throw error;
         }
 
         // Wrap unexpected errors with context
-        console.error("Gemini API error:", error);
+        console.error("Groq API error:", error);
         throw new Error(
             `Failed to enhance script: ${error.message || "Unknown error"}. Please check your internet connection and try again.`
         );

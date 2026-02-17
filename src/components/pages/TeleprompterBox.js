@@ -29,7 +29,7 @@
 //            Loading spinner is visible (Section 4).
 //
 // STEP 7  → AI response received
-//            The raw JSON text comes back from Gemini.
+//            The raw JSON text comes back from Groq.
 //            The service parses and validates it.
 //
 // STEP 8  → Parsed into enhancedData state
@@ -57,7 +57,7 @@
 // ============================================
 
 import { useState, useEffect, useRef } from "react";
-import { enhanceScriptWithGemini } from "./enhanceScriptService";
+import { enhanceScriptWithGroq } from "./enhanceScriptService";
 
 // ============================================
 // EXISTING ANALYSIS ENGINE — DO NOT MODIFY
@@ -239,7 +239,7 @@ function scoreLabel(score) {
 //   while rendering normal text as plain spans.
 //
 // WHY IT EXISTS:
-//   The Gemini-enhanced script contains inline tags that need
+//   The Groq-enhanced script contains inline tags that need
 //   visual treatment during practice mode so the speaker can
 //   see delivery cues at a glance.
 //
@@ -344,7 +344,7 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
 
   // --- B) AI ENHANCEMENT STATES (NEW) ---
 
-  // The structured response from Gemini after enhancement
+  // The structured response from Groq after enhancement
   // Shape: { enhanced_script, key_points, memory_summary, flow_structure, modulation_notes }
   const [enhancedData, setEnhancedData] = useState(null);
 
@@ -447,11 +447,11 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
   };
 
   // ============================================
-  // SECTION 3: GEMINI SCRIPT ENHANCEMENT FUNCTION
+  // SECTION 3: GROQ SCRIPT ENHANCEMENT FUNCTION
   // ============================================
   //
   // WHAT THIS SECTION DOES:
-  //   Calls the enhanceScriptWithGemini service when the user
+  //   Calls the enhanceScriptWithGroq service when the user
   //   clicks "Enhance Script". Manages loading and error states.
   //
   // WHY IT EXISTS:
@@ -467,7 +467,7 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
    *
    * WHAT THIS FUNCTION DOES:
    *   1. Sets loading state
-   *   2. Calls enhanceScriptWithGemini() from the service module
+   *   2. Calls enhanceScriptWithGroq() from the service module
    *   3. On success: stores the result and switches to review mode
    *   4. On failure: displays the error message
    *
@@ -484,8 +484,8 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
     setEnhanceError(null);
 
     try {
-      // Call the Gemini service (Section 3 → enhanceScriptService.js)
-      const result = await enhanceScriptWithGemini(originalScript);
+      // Call the Groq service (Section 3 → enhanceScriptService.js)
+      const result = await enhanceScriptWithGroq(originalScript);
 
       // SECTION 5: PROCESSING AI RESPONSE
       // Store the validated structured output in state
@@ -914,7 +914,7 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <span className="tp-score-value">{sessionScoreUI}</span>
                 <span className={`tp-score-label ${sessionScoreUI >= 85 ? "excellent" :
-                    sessionScoreUI >= 65 ? "good" : "needs-work"
+                  sessionScoreUI >= 65 ? "good" : "needs-work"
                   }`}>
                   {scoreLabel(sessionScoreUI)}
                 </span>
