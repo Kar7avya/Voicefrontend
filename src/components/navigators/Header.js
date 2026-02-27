@@ -1,148 +1,66 @@
-import "../navigators/Header.css";
+import "./Header.css";
 import React, { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";                   // ⬅ added toast
-import supabase from "../pages/supabaseClient";                 // ⬅ make sure path is correct
-import "bootstrap/dist/css/bootstrap.min.css";
-import "bootstrap/dist/js/bootstrap.bundle.min.js";
-import image from "../pages/image.png";
+import { toast } from "react-toastify";
+import supabase from "../pages/supabaseClient";
 
 const Header = () => {
-  const [scrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
 
   async function handleLogout() {
-    console.log("🔒 Logging out...");
     const { error } = await supabase.auth.signOut();
-
     if (error) {
-      console.error("❌ Logout error:", error);
       toast.error("Logout failed!");
     } else {
-      // Clear local storage tokens
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("user_id");
-      localStorage.removeItem("user_email");
-
-      toast.success("You have been logged out!");
+      localStorage.clear();
+      toast.success("Logged out!");
       navigate("/login");
     }
   }
 
   return (
-    <nav
-      className={`navbar navbar-expand-lg navbar-dark bg-dark static-top ${scrolled ? "shadow-sm" : ""
-        }`}
-    >
-      <div className="container">
-        {/* Brand / Logo */}
+    <div className="navbar-wrapper">
+      <nav className="navbar-pill">
+        {/* Brand */}
         <NavLink className="navbar-brand" to="/">
-          <img
-            src={image}
-            alt="Logo"
-            height="36"
-            style={{
-              mixBlendMode: 'screen',
-              background: 'transparent'
-            }}
-          />
+          <span className="brand-icon">🔊</span>
+          <span className="brand-name">VoiceAI</span>
         </NavLink>
 
-        {/* Toggle Button (Mobile) */}
-        <button
-          className="navbar-toggler"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#navbarResponsive"
-          aria-controls="navbarResponsive"
-          aria-expanded="false"
-          aria-label="Toggle navigation"
-        >
-          <span className="navbar-toggler-icon"></span>
-        </button>
+        {/* Desktop Links */}
+        <ul className="nav-links">
+          <li><NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/">Home</NavLink></li>
+          <li><NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/upload">Upload</NavLink></li>
+          <li><NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/dashboard">Dashboard</NavLink></li>
+          <li><NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/teleprompter">Teleprompter</NavLink></li>
+          <li><NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/tts">TTS</NavLink></li>
+        </ul>
 
-        {/* Links */}
-        <div className="collapse navbar-collapse" id="navbarResponsive">
-          <ul className="navbar-nav ms-auto">
-            <li className="nav-item">
-              <NavLink
-                className={({ isActive }) =>
-                  `nav-link ${isActive ? "active" : ""}`
-                }
-                to="/"
-              >
-                Home
-              </NavLink>
-            </li>
-
-            <li className="nav-item">
-              <NavLink
-                className={({ isActive }) =>
-                  `nav-link ${isActive ? "active" : ""}`
-                }
-                to="/upload"
-              >
-                Upload
-              </NavLink>
-            </li>
-
-            <li className="nav-item">
-              <NavLink
-                className={({ isActive }) =>
-                  `nav-link ${isActive ? "active" : ""}`
-                }
-                to="/dashboard"
-              >
-                Dashboard
-              </NavLink>
-            </li>
-
-
-
-            {/* <li className="nav-item">
-              <NavLink
-                className={({ isActive }) =>
-                  `nav-link ${isActive ? "active" : ""}`
-                }
-                to="/voicestudio"
-              >
-                Voice Studio
-              </NavLink>
-            </li> */}
-
-            <li className="nav-item">
-              <NavLink
-                className={({ isActive }) =>
-                  `nav-link ${isActive ? "active" : ""}`
-                }
-                to="/teleprompter"
-              >
-                Teleprompter
-              </NavLink>
-            </li>
-
-            <li className="nav-item">
-              <NavLink
-                className={({ isActive }) =>
-                  `nav-link ${isActive ? "active" : ""}`
-                }
-                to="/tts"
-              >
-                TTS
-              </NavLink>
-            </li>
-
-            {/* Logout Button */}
-            <li className="nav-item">
-              <button className="btn btn-danger ms-2" onClick={handleLogout}>
-                Logout
-              </button>
-            </li>
-          </ul>
+        {/* Actions */}
+        <div className="nav-actions">
+          <button className="btn-outline" onClick={handleLogout}>Logout</button>
+          <NavLink className="btn-primary" to="/tts">Try Now</NavLink>
         </div>
-      </div>
-    </nav>
+
+        {/* Mobile Toggle */}
+        <button className="hamburger" onClick={() => setMenuOpen(!menuOpen)}>
+          <span></span><span></span><span></span>
+        </button>
+      </nav>
+
+      {/* Mobile Menu */}
+      {menuOpen && (
+        <div className="mobile-menu">
+          <NavLink to="/" onClick={() => setMenuOpen(false)}>Home</NavLink>
+          <NavLink to="/upload" onClick={() => setMenuOpen(false)}>Upload</NavLink>
+          <NavLink to="/dashboard" onClick={() => setMenuOpen(false)}>Dashboard</NavLink>
+          <NavLink to="/teleprompter" onClick={() => setMenuOpen(false)}>Teleprompter</NavLink>
+          <NavLink to="/tts" onClick={() => setMenuOpen(false)}>TTS</NavLink>
+          <button onClick={handleLogout}>Logout</button>
+        </div>
+      )}
+    </div>
   );
 };
 
