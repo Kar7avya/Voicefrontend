@@ -21,7 +21,7 @@ export default function VoiceForge() {
   const [generated, setGenerated] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
-  const progressRef = useRef(null);
+  // const progressRef = useRef(null);
 
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
   const chars = text.length;
@@ -511,8 +511,8 @@ export default function VoiceForge() {
               <span className="vf-logo-text">VoiceForge</span>
             </div>
             <div className="vf-nav-links">
-              <a href="#">Documentation</a>
-              <a href="#">Pricing</a>
+              <button onClick={() => { }}>Some text</button>
+              <button onClick={() => { }}>Some text</button>
               <button className="vf-nav-btn">Account</button>
             </div>
           </div>
@@ -672,9 +672,9 @@ export default function VoiceForge() {
         <footer className="vf-footer">
           <span className="vf-footer-copy">© 2024 VoiceForge AI · Powered by XTTS-v2</span>
           <div className="vf-footer-links">
-            <a href="#">Safety</a>
-            <a href="#">API</a>
-            <a href="#">Privacy</a>
+            <button onClick={() => { }}>Some text</button>
+            <button onClick={() => { }}>Some text</button>
+            <button onClick={() => { }}>Some text</button>
           </div>
         </footer>
       </div>

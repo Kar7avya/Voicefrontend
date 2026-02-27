@@ -12,7 +12,7 @@ import Login from './components/pages/Login';
 import Dashboard from './components/pages/Dashboard';
 import AuthCallback from './components/pages/AuthCallback';
 import supabase from './components/pages/supabaseClient';
-import VoiceStudio from './components/pages/VoiceStudio';
+// import VoiceStudio from './components/pages/VoiceStudio';
 import Teleprompter from './components/pages/Teleprompter';
 // import VoiceForge from './components/pages/VoiceForge';
 import TTSPage from "./components/pages/TTSPage";
@@ -214,7 +214,7 @@ function App() {
           <Route path="home" element={<Home />} />
           <Route path="upload" element={<Upload />} />
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="voicestudio" element={<VoiceStudio />} />
+          {/* <Route path="voicestudio" element={<VoiceStudio />} /> */}
           <Route path="teleprompter" element={<Teleprompter />} />
           <Route path="tts" element={<TTSPage />} />
         </Route>

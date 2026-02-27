@@ -92,7 +92,7 @@ const Header = () => {
 
 
 
-            <li className="nav-item">
+            {/* <li className="nav-item">
               <NavLink
                 className={({ isActive }) =>
                   `nav-link ${isActive ? "active" : ""}`
@@ -101,7 +101,7 @@ const Header = () => {
               >
                 Voice Studio
               </NavLink>
-            </li>
+            </li> */}
 
             <li className="nav-item">
               <NavLink
