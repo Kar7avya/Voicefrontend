@@ -1718,7 +1718,7 @@ export default function Upload() {
                   rel="noopener noreferrer"
                   className="text-[#007AFF] text-sm font-medium hover:underline underline-offset-2"
                 >
-                  View file ↗
+                  {filename || "View file"} ↗
                 </a>
               )}
             </div>
