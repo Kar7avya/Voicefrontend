@@ -3,7 +3,7 @@ import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion"
 import { Mic, Play, Pause, Download, X, Check, Volume2, History, RefreshCw } from "lucide-react";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const API = process.env.REACT_APP_BACKEND_URL + "/api/tts";
+const API = process.env.REACT_APP_BACKEND_URL + "/api/tts ";
 
 const LANGUAGES = [
     { id: "hindi", flag: "🇮🇳", name: "Hindi", script: "हिंदी", code: "hi" },
