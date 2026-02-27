@@ -1,4 +1,8 @@
 /* General body styles - ensure content is not hidden by fixed navbar */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -1238,4 +1242,3 @@ code {
     transform: translateY(0);
   }
 }
-
