@@ -197,7 +197,7 @@ function App() {
         />
 
         {/* VoiceForge demo (public, standalone) */}
-        <Route path="/voiceforge" element={<VoiceForge />} />
+        {/* <Route path="/voiceforge" element={<VoiceForge />} /> */}
 
         {/* Email verification callback route */}
         <Route path="/auth/callback" element={<AuthCallback />} />
