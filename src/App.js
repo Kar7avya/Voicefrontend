@@ -15,7 +15,7 @@ import supabase from './components/pages/supabaseClient';
 import VoiceStudio from './components/pages/VoiceStudio';
 import Teleprompter from './components/pages/Teleprompter';
 import VoiceForge from './components/pages/VoiceForge';
-import TTSPage from "./pages/TTSPage";
+import TTSPage from "./components/pages/TTSPage";
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
