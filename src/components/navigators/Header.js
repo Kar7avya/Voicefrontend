@@ -114,6 +114,17 @@ const Header = () => {
               </NavLink>
             </li>
 
+            <li className="nav-item">
+              <NavLink
+                className={({ isActive }) =>
+                  `nav-link ${isActive ? "active" : ""}`
+                }
+                to="/tts"
+              >
+                TTS
+              </NavLink>
+            </li>
+
             {/* Logout Button */}
             <li className="nav-item">
               <button className="btn btn-danger ms-2" onClick={handleLogout}>
