@@ -38,7 +38,15 @@ const Header = () => {
       <div className="container">
         {/* Brand / Logo */}
         <NavLink className="navbar-brand" to="/">
-          <img src={image} alt="Logo" height="36" />
+          <img
+            src={image}
+            alt="Logo"
+            height="36"
+            style={{
+              mixBlendMode: 'screen',
+              background: 'transparent'
+            }}
+          />
         </NavLink>
 
         {/* Toggle Button (Mobile) */}

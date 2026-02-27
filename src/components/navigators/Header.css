@@ -7,11 +7,11 @@
 
 /* Navbar Styles */
 .navbar {
-  /* transition: background-color 0.3s ease, backdrop-filter 0.3s ease, box-shadow 0.3s ease; */
   padding: 0.8rem 1.5rem;
-  background-color: transparent;
-  backdrop-filter: blur(0px);
-  box-shadow: none;
+  background-color: rgba(20, 20, 30, 0.95) !important;
+  /* dark solid background */
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
   position: fixed;
   width: 100%;
   top: 0;
@@ -26,7 +26,7 @@
 .scrolled-navbar {
   background-color: rgba(33, 121, 179, 0.728);
   backdrop-filter: blur(10px);
-  
+
   box-shadow: 0 2px 10px rgba(141, 12, 12, 0.698);
 }
 
@@ -77,5 +77,6 @@
 body {
   margin: 0;
   font-family: sans-serif;
-  padding-top: 70px; /* Only if your content goes under the navbar */
+  padding-top: 70px;
+  /* Only if your content goes under the navbar */
 }
