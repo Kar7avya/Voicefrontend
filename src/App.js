@@ -14,6 +14,8 @@ import AuthCallback from './components/pages/AuthCallback';
 import supabase from './components/pages/supabaseClient';
 import VoiceStudio from './components/pages/VoiceStudio';
 import Teleprompter from './components/pages/Teleprompter';
+import VoiceForge from './components/pages/VoiceForge';
+import TTSPage from "./pages/TTSPage";
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -194,6 +196,9 @@ function App() {
           }
         />
 
+        {/* VoiceForge demo (public, standalone) */}
+        <Route path="/voiceforge" element={<VoiceForge />} />
+
         {/* Email verification callback route */}
         <Route path="/auth/callback" element={<AuthCallback />} />
 
@@ -211,6 +216,7 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="voicestudio" element={<VoiceStudio />} />
           <Route path="teleprompter" element={<Teleprompter />} />
+          <Route path="tts" element={<TTSPage />} />
         </Route>
 
         {/* Catch-all: redirect unknown paths based on auth state */}
