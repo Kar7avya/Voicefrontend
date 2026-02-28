@@ -7,7 +7,6 @@ const API = "https://kartavya11-smart-tts-api.hf.space";
 
 const HEADERS = {
     "Content-Type": "application/json",
-    "ngrok-skip-browser-warning": "true",
 };
 
 const LANGUAGES = [
