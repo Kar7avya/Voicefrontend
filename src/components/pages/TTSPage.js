@@ -3,22 +3,27 @@ import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion"
 import { Mic, Play, Pause, Download, X, Check, Volume2, History, RefreshCw } from "lucide-react";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const API = process.env.REACT_APP_BACKEND_URL + "/api/tts ";
+const API = "https://inaudible-unwatchfully-pandora.ngrok-free.dev";
+
+const HEADERS = {
+    "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true",
+};
 
 const LANGUAGES = [
-    { id: "hindi", flag: "🇮🇳", name: "Hindi", script: "हिंदी", code: "hi" },
-    { id: "english", flag: "🌍", name: "English", script: "English", code: "en" },
-    { id: "tamil", flag: "🏛️", name: "Tamil", script: "தமிழ்", code: "ta" },
-    { id: "telugu", flag: "🌅", name: "Telugu", script: "తెలుగు", code: "te" },
-    { id: "malayalam", flag: "🌴", name: "Malayalam", script: "മലയാളം", code: "ml" },
-    { id: "bengali", flag: "🎨", name: "Bengali", script: "বাংলা", code: "bn" },
+    { id: "hindi",     flag: "🇮🇳", name: "Hindi",     script: "हिंदी",    code: "hi" },
+    { id: "english",   flag: "🌍",  name: "English",   script: "English",  code: "en" },
+    { id: "tamil",     flag: "🏛️",  name: "Tamil",     script: "தமிழ்",   code: "ta" },
+    { id: "telugu",    flag: "🌅",  name: "Telugu",    script: "తెలుగు",  code: "te" },
+    { id: "malayalam", flag: "🌴",  name: "Malayalam", script: "മലയാളം", code: "ml" },
+    { id: "bengali",   flag: "🎨",  name: "Bengali",   script: "বাংলা",   code: "bn" },
 ];
 
 const MOODS = [
-    { id: "neutral", emoji: "😐", name: "Neutral", desc: "Balanced & Clear", hex: "#FFFFFF" },
-    { id: "happy", emoji: "😊", name: "Happy", desc: "Bright & Energetic", hex: "#F59E0B" },
-    { id: "sad", emoji: "😔", name: "Sad", desc: "Soft & Gentle", hex: "#3B82F6" },
-    { id: "angry", emoji: "😠", name: "Angry", desc: "Bold & Intense", hex: "#EF4444" },
+    { id: "neutral", emoji: "😐", name: "Neutral", desc: "Balanced & Clear",   hex: "#FFFFFF" },
+    { id: "happy",   emoji: "😊", name: "Happy",   desc: "Bright & Energetic", hex: "#F59E0B" },
+    { id: "sad",     emoji: "😔", name: "Sad",     desc: "Soft & Gentle",      hex: "#3B82F6" },
+    { id: "angry",   emoji: "😠", name: "Angry",   desc: "Bold & Intense",     hex: "#EF4444" },
 ];
 
 const PLACEHOLDERS = [
@@ -32,38 +37,33 @@ const PLACEHOLDERS = [
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 const SmartTTS = () => {
-    // UI State
-    const [isScrolled, setIsScrolled] = useState(false);
-    const [placeholderIdx, setPlaceholderIdx] = useState(0);
-    const [serverOnline, setServerOnline] = useState(null);
-    const [showHistory, setShowHistory] = useState(false);
+    const [isScrolled,         setIsScrolled]         = useState(false);
+    const [placeholderIdx,     setPlaceholderIdx]     = useState(0);
+    const [serverOnline,       setServerOnline]       = useState(null);
+    const [showHistory,        setShowHistory]        = useState(false);
 
-    // Form State
-    const [text, setText] = useState("");
-    const [activeLang, setActiveLang] = useState("hindi");
-    const [activeGender, setActiveGender] = useState("female");
-    const [activeMood, setActiveMood] = useState("neutral");
+    const [text,               setText]               = useState("");
+    const [activeLang,         setActiveLang]         = useState("hindi");
+    const [activeGender,       setActiveGender]       = useState("female");
+    const [activeMood,         setActiveMood]         = useState("neutral");
 
-    // Generation State
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [generationSuccess, setGenerationSuccess] = useState(false);
-    const [error, setError] = useState(null);
+    const [isGenerating,       setIsGenerating]       = useState(false);
+    const [generationSuccess,  setGenerationSuccess]  = useState(false);
+    const [error,              setError]              = useState(null);
 
-    // Audio State
-    const [showPlayer, setShowPlayer] = useState(false);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [audioURL, setAudioURL] = useState(null);
-    const [progress, setProgress] = useState(0);
-    const [duration, setDuration] = useState(0);
-    const [currentTime, setCurrentTime] = useState(0);
+    const [showPlayer,         setShowPlayer]         = useState(false);
+    const [isPlaying,          setIsPlaying]          = useState(false);
+    const [audioURL,           setAudioURL]           = useState(null);
+    const [progress,           setProgress]           = useState(0);
+    const [duration,           setDuration]           = useState(0);
+    const [currentTime,        setCurrentTime]        = useState(0);
 
-    // History
-    const [history, setHistory] = useState([]);
+    const [history,            setHistory]            = useState([]);
 
-    const audioRef = useRef(null);
+    const audioRef    = useRef(null);
     const { scrollY } = useScroll();
     const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]);
-    const heroY = useTransform(scrollY, [0, 400], [0, 100]);
+    const heroY       = useTransform(scrollY, [0, 400], [0, 100]);
 
     // ── Effects ──────────────────────────────────────────────────────────────
     useEffect(() => {
@@ -80,10 +80,11 @@ const SmartTTS = () => {
         return () => clearInterval(interval);
     }, []);
 
+    // Check server status
     useEffect(() => {
-        fetch(`${API}/status`)
+        fetch(`${API}/`, { headers: HEADERS })
             .then(r => r.json())
-            .then(d => setServerOnline(d.online))
+            .then(d => setServerOnline(d.status === "running" || !!d.status))
             .catch(() => setServerOnline(false));
     }, []);
 
@@ -95,22 +96,22 @@ const SmartTTS = () => {
             setCurrentTime(audio.currentTime);
             setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0);
         };
-        const onLoad = () => setDuration(audio.duration);
-        const onEnd = () => { setIsPlaying(false); setProgress(0); setCurrentTime(0); };
-        audio.addEventListener("timeupdate", onTime);
+        const onLoad  = () => setDuration(audio.duration);
+        const onEnd   = () => { setIsPlaying(false); setProgress(0); setCurrentTime(0); };
+        audio.addEventListener("timeupdate",     onTime);
         audio.addEventListener("loadedmetadata", onLoad);
-        audio.addEventListener("ended", onEnd);
+        audio.addEventListener("ended",          onEnd);
         return () => {
-            audio.removeEventListener("timeupdate", onTime);
+            audio.removeEventListener("timeupdate",     onTime);
             audio.removeEventListener("loadedmetadata", onLoad);
-            audio.removeEventListener("ended", onEnd);
+            audio.removeEventListener("ended",          onEnd);
         };
     }, [audioURL]);
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     const formatTime = (s) => {
         if (!s || isNaN(s)) return "0:00";
-        const m = Math.floor(s / 60);
+        const m   = Math.floor(s / 60);
         const sec = Math.floor(s % 60).toString().padStart(2, "0");
         return `${m}:${sec}`;
     };
@@ -119,20 +120,20 @@ const SmartTTS = () => {
         const audio = audioRef.current;
         if (!audio) return;
         if (isPlaying) { audio.pause(); setIsPlaying(false); }
-        else { audio.play(); setIsPlaying(true); }
+        else           { audio.play();  setIsPlaying(true);  }
     };
 
     const handleDownload = () => {
         if (!audioURL) return;
-        const a = document.createElement("a");
-        a.href = audioURL;
+        const a    = document.createElement("a");
+        a.href     = audioURL;
         a.download = `SmartTTS_${activeLang}_${activeMood}_${Date.now()}.mp3`;
         a.click();
     };
 
     const fetchHistory = async () => {
         try {
-            const res = await fetch(`${API}/history?limit=10`);
+            const res  = await fetch(`${API}/history?limit=10`, { headers: HEADERS });
             const data = await res.json();
             setHistory(data.history ?? []);
         } catch { }
@@ -147,21 +148,22 @@ const SmartTTS = () => {
 
         try {
             const res = await fetch(`${API}/generate`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
+                method:  "POST",
+                headers: HEADERS,
+                body:    JSON.stringify({
                     text,
                     voice_key: `${activeLang}_${activeGender}`,
-                    mood: activeMood,
-                    language: LANGUAGES.find(l => l.id === activeLang)?.code ?? "hi",
-                    save_history: true,
+                    mood:       activeMood,
                 }),
             });
 
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Generation failed");
+            if (!res.ok) throw new Error(data.detail || data.error || "Generation failed");
 
-            setAudioURL(data.audio_url);
+            // Fix audio URL - prepend API base URL
+            const fullAudioURL = API + data.audio_url;
+            setAudioURL(fullAudioURL);
+
             setIsGenerating(false);
             setGenerationSuccess(true);
 
@@ -187,18 +189,16 @@ const SmartTTS = () => {
             {/* Hidden audio element */}
             <audio ref={audioRef} src={audioURL || ""} />
 
-            {/* ── Background ───────────────────────────────────────────────────── */}
+            {/* ── Background ─────────────────────────────────────────────────── */}
             <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
                 <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-[#7C3AED]/10 blur-[120px] animate-pulse" />
                 <div className="absolute top-[20%] right-[-10%] w-[35%] h-[35%] rounded-full bg-[#06B6D4]/10 blur-[120px] animate-pulse" style={{ animationDelay: "1s" }} />
                 <div className="absolute bottom-[-10%] left-[30%] w-[30%] h-[30%] rounded-full bg-[#7C3AED]/5 blur-[120px] animate-pulse" style={{ animationDelay: "2s" }} />
-                {/* Noise */}
                 <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` }} />
-                {/* Grid */}
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:100px_100px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)]" />
             </div>
 
-            {/* ── Navigation ───────────────────────────────────────────────────── */}
+            {/* ── Navigation ─────────────────────────────────────────────────── */}
             <nav className={`fixed top-6 left-1/2 -translate-x-1/2 z-40 transition-all duration-500 flex items-center justify-between px-6 py-4 rounded-full border border-white/10 bg-white/5 backdrop-blur-xl ${isScrolled ? "w-[90%] max-w-2xl" : "w-[95%] max-w-4xl"}`}>
                 <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#7C3AED] to-[#06B6D4] flex items-center justify-center">
@@ -209,12 +209,14 @@ const SmartTTS = () => {
 
                 <div className="hidden md:flex items-center gap-8 text-sm text-white/60">
                     <a href="#interface" className="hover:text-white transition-colors">Studio</a>
-                    <button onClick={() => { fetchHistory(); setShowHistory(v => !v); }} className="hover:text-white transition-colors flex items-center gap-1">
+                    <button
+                        onClick={() => { fetchHistory(); setShowHistory(v => !v); }}
+                        className="hover:text-white transition-colors flex items-center gap-1"
+                    >
                         <History size={14} /> History
                     </button>
                 </div>
 
-                {/* Server status */}
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
                         <span className={`w-2 h-2 rounded-full ${serverOnline === null ? "bg-gray-400 animate-pulse" : serverOnline ? "bg-green-400 animate-pulse" : "bg-red-400"}`} />
@@ -228,16 +230,12 @@ const SmartTTS = () => {
                 </div>
             </nav>
 
-            {/* ── Hero ─────────────────────────────────────────────────────────── */}
+            {/* ── Hero ───────────────────────────────────────────────────────── */}
             <motion.section
                 className="relative h-screen flex flex-col items-center justify-center pt-20 px-4 text-center z-10"
                 style={{ opacity: heroOpacity, y: heroY }}
             >
-                <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8 }}
-                >
+                <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
                     <h1 className="text-6xl md:text-[8rem] font-black leading-[0.9] tracking-tighter">
                         <span className="block text-white">SPEAK IN</span>
                         <span className="block bg-clip-text text-transparent bg-gradient-to-r from-[#7C3AED] to-[#06B6D4]">
@@ -257,7 +255,6 @@ const SmartTTS = () => {
                     </motion.a>
                 </motion.div>
 
-                {/* Waveform background decoration */}
                 <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-10 pointer-events-none -z-10">
                     {[...Array(50)].map((_, i) => (
                         <motion.div
@@ -269,7 +266,6 @@ const SmartTTS = () => {
                     ))}
                 </div>
 
-                {/* Scroll hint */}
                 <motion.div
                     className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/30 text-xs"
                     animate={{ y: [0, 8, 0] }}
@@ -280,7 +276,7 @@ const SmartTTS = () => {
                 </motion.div>
             </motion.section>
 
-            {/* ── Interface Card ────────────────────────────────────────────────── */}
+            {/* ── Interface Card ─────────────────────────────────────────────── */}
             <section id="interface" className="relative z-10 px-4 pb-40">
                 <motion.div
                     initial={{ opacity: 0, y: 60 }}
@@ -289,12 +285,10 @@ const SmartTTS = () => {
                     transition={{ duration: 0.8 }}
                     className="max-w-3xl mx-auto"
                 >
-                    {/* Card glow top border */}
                     <div className="h-px w-full bg-gradient-to-r from-transparent via-[#7C3AED] to-transparent mb-0 rounded-t-[32px]" />
 
                     <div className="bg-white/[0.03] backdrop-blur-3xl border border-white/10 rounded-[32px] p-6 md:p-12 shadow-2xl">
 
-                        {/* Section title */}
                         <div className="flex items-center justify-between mb-8">
                             <div>
                                 <h2 className="text-2xl font-black tracking-tight">Voice Studio</h2>
@@ -305,7 +299,7 @@ const SmartTTS = () => {
                             </div>
                         </div>
 
-                        {/* ── Text Input ─────────────────────────────────────────────── */}
+                        {/* ── Text Input ─────────────────────────────────────────── */}
                         <div className="relative group mb-10">
                             <div className="absolute -inset-0.5 bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] rounded-[22px] blur opacity-0 group-focus-within:opacity-30 transition duration-500" />
                             <textarea
@@ -322,7 +316,7 @@ const SmartTTS = () => {
 
                         <div className="space-y-10">
 
-                            {/* ── Language ───────────────────────────────────────────────── */}
+                            {/* ── Language ───────────────────────────────────────────── */}
                             <div>
                                 <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold block mb-4">
                                     Select Language
@@ -337,7 +331,7 @@ const SmartTTS = () => {
                                             className={`flex flex-col items-center justify-center shrink-0 w-24 h-24 rounded-2xl border transition-all duration-300 ${activeLang === lang.id
                                                 ? "bg-[#7C3AED]/20 border-[#7C3AED] shadow-lg shadow-[#7C3AED]/20"
                                                 : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10"
-                                                }`}
+                                            }`}
                                         >
                                             <span className="text-3xl mb-1">{lang.flag}</span>
                                             <span className="text-xs font-bold">{lang.name}</span>
@@ -347,7 +341,7 @@ const SmartTTS = () => {
                                 </div>
                             </div>
 
-                            {/* ── Gender + Mood ───────────────────────────────────────────── */}
+                            {/* ── Gender + Mood ──────────────────────────────────────── */}
                             <div className="flex flex-col md:flex-row gap-8">
 
                                 {/* Gender */}
@@ -387,9 +381,9 @@ const SmartTTS = () => {
                                                 whileTap={{ scale: 0.95 }}
                                                 className="flex flex-col p-3 rounded-2xl border transition-all duration-200"
                                                 style={{
-                                                    background: activeMood === mood.id ? `${mood.hex}15` : "rgba(255,255,255,0.03)",
-                                                    borderColor: activeMood === mood.id ? mood.hex : "transparent",
-                                                    boxShadow: activeMood === mood.id ? `0 0 20px ${mood.hex}25` : "none",
+                                                    background:   activeMood === mood.id ? `${mood.hex}15` : "rgba(255,255,255,0.03)",
+                                                    borderColor:  activeMood === mood.id ? mood.hex : "transparent",
+                                                    boxShadow:    activeMood === mood.id ? `0 0 20px ${mood.hex}25` : "none",
                                                 }}
                                             >
                                                 <span className="text-2xl mb-1">{mood.emoji}</span>
@@ -401,7 +395,7 @@ const SmartTTS = () => {
                                 </div>
                             </div>
 
-                            {/* ── Error ──────────────────────────────────────────────────── */}
+                            {/* ── Error ──────────────────────────────────────────────── */}
                             <AnimatePresence>
                                 {error && (
                                     <motion.div
@@ -416,19 +410,15 @@ const SmartTTS = () => {
                                 )}
                             </AnimatePresence>
 
-                            {/* ── Generate Button ─────────────────────────────────────────── */}
+                            {/* ── Generate Button ────────────────────────────────────── */}
                             <motion.button
                                 onClick={handleGenerate}
                                 disabled={isGenerating || !text.trim()}
                                 whileHover={!isGenerating && text.trim() ? { scale: 1.02 } : {}}
                                 whileTap={!isGenerating && text.trim() ? { scale: 0.98 } : {}}
-                                className={`w-full h-16 rounded-2xl relative overflow-hidden transition-all duration-300 font-bold text-lg ${!text.trim() || isGenerating ? "opacity-50 cursor-not-allowed" : ""
-                                    }`}
+                                className={`w-full h-16 rounded-2xl relative overflow-hidden transition-all duration-300 font-bold text-lg ${!text.trim() || isGenerating ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
                                 <div className="absolute inset-0 bg-gradient-to-r from-[#7C3AED] to-[#06B6D4]" />
-                                {!isGenerating && !generationSuccess && (
-                                    <div className="absolute inset-0 bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] opacity-0 hover:opacity-100 blur-xl transition-all duration-300" />
-                                )}
                                 <div className="relative z-10 flex items-center justify-center gap-3">
                                     {isGenerating ? (
                                         <span className="flex items-center gap-3">
@@ -445,7 +435,6 @@ const SmartTTS = () => {
                                         </span>
                                     )}
                                 </div>
-                                {/* Progress bar */}
                                 {isGenerating && (
                                     <motion.div
                                         className="absolute bottom-0 left-0 h-1 bg-white/40"
@@ -460,7 +449,7 @@ const SmartTTS = () => {
                     </div>
                 </motion.div>
 
-                {/* ── History Panel ─────────────────────────────────────────────── */}
+                {/* ── History Panel ──────────────────────────────────────────── */}
                 <AnimatePresence>
                     {showHistory && (
                         <motion.div
@@ -470,14 +459,9 @@ const SmartTTS = () => {
                             className="max-w-3xl mx-auto mt-6 bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-[24px] p-6"
                         >
                             <div className="flex items-center justify-between mb-6">
-                                <h3 className="font-bold text-white/80 uppercase tracking-widest text-xs">
-                                    Recent Generations
-                                </h3>
-                                <button onClick={() => setShowHistory(false)} className="text-white/40 hover:text-white">
-                                    <X size={16} />
-                                </button>
+                                <h3 className="font-bold text-white/80 uppercase tracking-widest text-xs">Recent Generations</h3>
+                                <button onClick={() => setShowHistory(false)} className="text-white/40 hover:text-white"><X size={16} /></button>
                             </div>
-
                             {history.length === 0 ? (
                                 <p className="text-center text-white/30 py-8 text-sm">No history yet. Generate your first voice!</p>
                             ) : (
@@ -485,17 +469,11 @@ const SmartTTS = () => {
                                     {history.map(h => (
                                         <div key={h.id} className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 hover:bg-white/8 transition-colors">
                                             <div className="flex gap-2 shrink-0">
-                                                <span className="px-2 py-1 rounded-full bg-[#7C3AED]/20 border border-[#7C3AED]/30 text-[10px] text-[#a78bfa] font-bold uppercase">
-                                                    {h.voice_key}
-                                                </span>
-                                                <span className="px-2 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] text-white/60 font-bold uppercase">
-                                                    {h.mood}
-                                                </span>
+                                                <span className="px-2 py-1 rounded-full bg-[#7C3AED]/20 border border-[#7C3AED]/30 text-[10px] text-[#a78bfa] font-bold uppercase">{h.voice_key}</span>
+                                                <span className="px-2 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] text-white/60 font-bold uppercase">{h.mood}</span>
                                             </div>
                                             <p className="flex-1 text-sm text-white/50 truncate">{h.text}</p>
-                                            <span className="text-[10px] font-mono text-white/30 shrink-0">
-                                                {new Date(h.created_at).toLocaleTimeString()}
-                                            </span>
+                                            <span className="text-[10px] font-mono text-white/30 shrink-0">{new Date(h.created_at).toLocaleTimeString()}</span>
                                             {h.audio_url && (
                                                 <a href={h.audio_url} download className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors">
                                                     <Download size={14} className="text-white/60" />
@@ -510,7 +488,7 @@ const SmartTTS = () => {
                 </AnimatePresence>
             </section>
 
-            {/* ── Floating Audio Player ─────────────────────────────────────────── */}
+            {/* ── Floating Audio Player ──────────────────────────────────────── */}
             <AnimatePresence>
                 {showPlayer && audioURL && (
                     <motion.div
@@ -520,9 +498,7 @@ const SmartTTS = () => {
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
                         className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[92%] max-w-2xl z-50"
                     >
-                        {/* Glow */}
                         <div className="absolute -inset-1 bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] rounded-[28px] blur-xl opacity-20" />
-
                         <div className="relative bg-[#0d0d0f]/90 backdrop-blur-2xl border border-white/15 rounded-3xl p-5 shadow-2xl">
                             <div className="flex items-center gap-4">
 
@@ -535,11 +511,11 @@ const SmartTTS = () => {
                                 >
                                     {isPlaying
                                         ? <Pause size={20} className="text-white" />
-                                        : <Play size={20} className="text-white ml-1" />
+                                        : <Play  size={20} className="text-white ml-1" />
                                     }
                                 </motion.button>
 
-                                {/* Waveform + progress */}
+                                {/* Progress */}
                                 <div className="flex-1 flex flex-col gap-2">
                                     <div className="flex justify-between items-center">
                                         <div className="flex gap-2">
@@ -547,16 +523,12 @@ const SmartTTS = () => {
                                                 {LANGUAGES.find(l => l.id === activeLang)?.name}
                                             </span>
                                             <span className="text-[10px] uppercase tracking-widest text-white/40 font-mono">·</span>
-                                            <span className="text-[10px] uppercase tracking-widest text-white/40 font-mono">
-                                                {activeMood}
-                                            </span>
+                                            <span className="text-[10px] uppercase tracking-widest text-white/40 font-mono">{activeMood}</span>
                                         </div>
                                         <span className="text-[10px] font-mono text-white/40">
                                             {formatTime(currentTime)} / {formatTime(duration)}
                                         </span>
                                     </div>
-
-                                    {/* Progress bar */}
                                     <div className="h-1.5 bg-white/10 rounded-full overflow-hidden cursor-pointer">
                                         <motion.div
                                             className="h-full bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] rounded-full"
@@ -564,16 +536,15 @@ const SmartTTS = () => {
                                             transition={{ duration: 0.1 }}
                                         />
                                     </div>
-
-                                    {/* Mini waveform decoration */}
                                     <div className="flex items-center gap-0.5 h-4">
                                         {[...Array(32)].map((_, i) => (
                                             <motion.div
                                                 key={i}
                                                 className="flex-1 bg-gradient-to-b from-[#7C3AED] to-[#06B6D4] rounded-full opacity-60"
-                                                animate={isPlaying ? {
-                                                    height: [`${Math.random() * 60 + 20}%`, `${Math.random() * 60 + 20}%`]
-                                                } : { height: "30%" }}
+                                                animate={isPlaying
+                                                    ? { height: [`${Math.random() * 60 + 20}%`, `${Math.random() * 60 + 20}%`] }
+                                                    : { height: "30%" }
+                                                }
                                                 transition={{ duration: 0.4, repeat: Infinity, repeatType: "reverse", delay: i * 0.02 }}
                                             />
                                         ))}
@@ -583,16 +554,14 @@ const SmartTTS = () => {
                                 {/* Actions */}
                                 <div className="flex items-center gap-2 shrink-0">
                                     <motion.button
-                                        whileHover={{ scale: 1.1 }}
-                                        whileTap={{ scale: 0.9 }}
+                                        whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
                                         onClick={handleDownload}
                                         className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
                                     >
                                         <Download size={16} className="text-white/70" />
                                     </motion.button>
                                     <motion.button
-                                        whileHover={{ scale: 1.1 }}
-                                        whileTap={{ scale: 0.9 }}
+                                        whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
                                         onClick={() => { setShowPlayer(false); setIsPlaying(false); audioRef.current?.pause(); }}
                                         className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
                                     >
