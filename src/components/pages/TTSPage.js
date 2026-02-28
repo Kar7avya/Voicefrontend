@@ -3,7 +3,7 @@ import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion"
 import { Mic, Play, Pause, Download, X, Check, Volume2, History, RefreshCw } from "lucide-react";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const API = "https://inaudible-unwatchfully-pandora.ngrok-free.dev";
+const API = "https://kartavya11-smart-tts-api.hf.space";
 
 const HEADERS = {
     "Content-Type": "application/json",
