@@ -826,26 +826,10 @@ import swamivivekanandaImage from "../pages/swamivivekanand.jpg";
 import veersavarkarImage from "../pages/veersavarkar.jpg";
 
 const slides = [
-  {
-    image: shivajiImage,
-    quote: "Freedom is a boon, which everyone has the right to receive.",
-    author: "Chhatrapati Shivaji Maharaj",
-  },
-  {
-    image: aurobindoImage,
-    quote: "Sanatan Dharma, that is Nationalism.",
-    author: "Sri Aurobindo",
-  },
-  {
-    image: veersavarkarImage,
-    quote: "Give me blood, and I shall give you freedom.",
-    author: "Subhash Chandra Bose",
-  },
-  {
-    image: swamivivekanandaImage,
-    quote: "Arise, awake and stop not till the goal is reached.",
-    author: "Swami Vivekananda",
-  },
+  { image: shivajiImage, quote: "Freedom is a boon, which everyone has the right to receive.", author: "Chhatrapati Shivaji Maharaj" },
+  { image: aurobindoImage, quote: "Sanatan Dharma, that is Nationalism.", author: "Sri Aurobindo" },
+  { image: veersavarkarImage, quote: "Give me blood, and I shall give you freedom.", author: "Subhash Chandra Bose" },
+  { image: swamivivekanandaImage, quote: "Arise, awake and stop not till the goal is reached.", author: "Swami Vivekananda" },
 ];
 
 const Login = () => {
@@ -860,11 +844,8 @@ const Login = () => {
   const [focused, setFocused] = useState("");
 
   useEffect(() => {
-    const timer = setInterval(
-      () => setCurrentSlide((prev) => (prev + 1) % slides.length),
-      5000
-    );
-    return () => clearInterval(timer);
+    const t = setInterval(() => setCurrentSlide(p => (p + 1) % slides.length), 5000);
+    return () => clearInterval(t);
   }, []);
 
   useEffect(() => {
@@ -873,10 +854,7 @@ const Login = () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) { navigate("/home"); return; }
         setSupabaseReady(true);
-      } catch (err) {
-        console.error("Auth check failed:", err);
-        setSupabaseReady(true);
-      }
+      } catch { setSupabaseReady(true); }
     };
     checkAuth();
   }, [navigate]);
@@ -884,212 +862,166 @@ const Login = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get("message") === "verify-email") {
-      const pendingEmail = sessionStorage.getItem("pending_email");
-      if (pendingEmail) {
-        setFormData((prev) => ({ ...prev, email: pendingEmail }));
-        toast.info("Please verify your email before logging in.");
-        sessionStorage.removeItem("pending_email");
-      }
+      const e = sessionStorage.getItem("pending_email");
+      if (e) { setFormData(p => ({ ...p, email: e })); toast.info("Please verify your email before logging in."); sessionStorage.removeItem("pending_email"); }
     }
   }, [location]);
 
-  const handleChange = (e) =>
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleChange = e => setFormData(p => ({ ...p, [e.target.name]: e.target.value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.email || !formData.password) { toast.error("Please fill in all fields"); return; }
-    if (!formData.email.includes("@")) { toast.error("Please enter a valid email address"); return; }
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
-      if (error) {
-        if (error.message.includes("Email not confirmed")) toast.error("Please confirm your email first.");
-        else if (error.message.includes("Invalid login credentials")) toast.error("Invalid email or password.");
-        else if (error.message.includes("Too many requests")) toast.error("Too many attempts. Please try again later.");
-        else toast.error(error.message || "Login failed. Please try again.");
-        return;
-      }
-      if (data.session && data.user) {
-        const userName = data.user.user_metadata?.full_name || data.user.email.split("@")[0] || "User";
-        toast.success(`Welcome back, ${userName}!`);
-        navigate("/home");
-      } else {
-        toast.error("Login failed. Please try again.");
-      }
-    } catch (err) {
-      toast.error(err.message?.includes("fetch") ? "Network error. Please try again." : "Something went wrong.");
-    } finally {
-      setLoading(false);
-    }
+      const { data, error } = await supabase.auth.signInWithPassword({ email: formData.email, password: formData.password });
+      if (error) { toast.error(error.message || "Login failed"); return; }
+      if (data.session) { toast.success(`Welcome back!`); navigate("/home"); }
+    } catch { toast.error("Something went wrong."); }
+    finally { setLoading(false); }
   };
 
   const handleForgotPassword = async () => {
-    if (!formData.email) { toast.error("Please enter your email address first"); return; }
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      if (error) toast.error(error.message);
-      else toast.success("Password reset email sent! Check your inbox.");
-    } catch {
-      toast.error("Failed to send reset email");
-    }
+    if (!formData.email) { toast.error("Enter your email first"); return; }
+    const { error } = await supabase.auth.resetPasswordForEmail(formData.email, { redirectTo: `${window.location.origin}/reset-password` });
+    if (error) toast.error(error.message); else toast.success("Reset email sent!");
   };
 
-  if (!supabaseReady) {
-    return (
-      <div style={s.loadingScreen}>
-        <div className="spinner" />
-        <p style={s.loadingText}>Loading...</p>
-      </div>
-    );
-  }
+  if (!supabaseReady) return (
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"100vh", background:"#0c0c0e" }}>
+      <div style={{ width:28,height:28,border:"2px solid rgba(255,255,255,0.1)",borderTop:"2px solid white",borderRadius:"50%",animation:"spin 0.8s linear infinite" }} />
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
 
   return (
     <div style={s.root}>
       <style>{css}</style>
 
-      {/* ── Left: Image Carousel ── */}
-      <div style={s.leftPanel}>
+      {/* ══ LEFT PANEL: Image Carousel ══ */}
+      <div style={s.left}>
+
+        {/* Image slides */}
         {slides.map((slide, i) => (
-          <div key={i} style={{ ...s.slide, opacity: currentSlide === i ? 1 : 0, zIndex: currentSlide === i ? 1 : 0 }}>
-            <img src={slide.image} alt={slide.author} style={s.slideImg} />
-            <div style={s.slideOverlay} />
+          <div key={i} style={{ position:"absolute", inset:0, opacity: currentSlide === i ? 1 : 0, transition:"opacity 1.6s ease", zIndex: currentSlide === i ? 1 : 0 }}>
+            <img src={slide.image} alt={slide.author} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+            <div style={s.imgOverlay} />
           </div>
         ))}
+
+        {/* Brand badge top-left */}
+        <div style={s.badge}>
+          <span style={s.badgeDot} />
+          <span style={s.badgeLabel}>Bharat Speaks</span>
+        </div>
+
+        {/* Quote at bottom */}
+        <div style={s.quoteBox}>
+          <svg width="28" height="20" viewBox="0 0 28 20" fill="none" style={{ marginBottom: 12, opacity: 0.4 }}>
+            <path d="M0 20V12.5C0 5.6 4.2 1.4 12.6 0L13.4 1.8C9.6 2.8 7.4 5 6.8 8.4H12V20H0ZM16 20V12.5C16 5.6 20.2 1.4 28.6 0L29.4 1.8C25.6 2.8 23.4 5 22.8 8.4H28V20H16Z" fill="white"/>
+          </svg>
+          <p style={s.quoteText}>{slides[currentSlide].quote}</p>
+          <p style={s.quoteAuthor}>— {slides[currentSlide].author}</p>
+        </div>
 
         {/* Dots */}
         <div style={s.dots}>
           {slides.map((_, i) => (
-            <button key={i} onClick={() => setCurrentSlide(i)} style={{ ...s.dot, width: i === currentSlide ? 28 : 8, opacity: i === currentSlide ? 1 : 0.35 }} />
+            <button key={i} onClick={() => setCurrentSlide(i)} style={{ ...s.dot, width: i === currentSlide ? 32 : 8, opacity: i === currentSlide ? 1 : 0.3 }} />
           ))}
         </div>
 
-        {/* Quote */}
-        <div style={s.quoteBox}>
-          <p style={s.quoteText}>"{slides[currentSlide].quote}"</p>
-          <p style={s.quoteAuthor}>— {slides[currentSlide].author}</p>
-        </div>
       </div>
 
-      {/* ── Right: Form ── */}
-      <div style={s.rightPanel}>
+      {/* ══ RIGHT PANEL: Login Form ══ */}
+      <div style={s.right}>
         <div style={s.card}>
 
-          {/* Logo */}
-          <div style={s.logo}>
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-              <circle cx="18" cy="18" r="17" stroke="white" strokeWidth="1.5" />
-              <path d="M12 18 L18 12 L24 18 L18 24 Z" fill="white" />
-            </svg>
-          </div>
-
           <h1 style={s.title}>Welcome back</h1>
-          <p style={s.subtitle}>
+          <p style={s.sub}>
             Don't have an account?{" "}
-            <button onClick={() => navigate("/signup")} disabled={loading} style={s.inlineLink}>
-              Sign up
-            </button>
+            <button onClick={() => navigate("/signup")} disabled={loading} style={s.linkBtn}>Sign up</button>
           </p>
 
-          <form onSubmit={handleSubmit} style={s.form}>
+          <form onSubmit={handleSubmit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
 
-            {/* Email Field */}
+            {/* Email */}
             <div style={s.field}>
               <label style={{
-                ...s.floatLabel,
-                color: focused === "email" ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
-                transform: formData.email || focused === "email" ? "translateY(-20px) scale(0.78)" : "translateY(0) scale(1)",
-              }}>
-                Email address
-              </label>
-              <input
-                type="email" name="email" value={formData.email}
-                onChange={handleChange}
-                onFocus={() => setFocused("email")}
-                onBlur={() => setFocused("")}
+                ...s.label,
+                top: formData.email || focused==="email" ? 9 : 19,
+                fontSize: formData.email || focused==="email" ? 11 : 15,
+                color: focused==="email" ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.35)",
+                letterSpacing: formData.email || focused==="email" ? 0.5 : 0,
+              }}>Email address</label>
+              <input type="email" name="email" value={formData.email} onChange={handleChange}
+                onFocus={() => setFocused("email")} onBlur={() => setFocused("")}
                 disabled={loading} required
-                style={{ ...s.input, borderColor: focused === "email" ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.1)" }}
+                style={{ ...s.input, borderColor: focused==="email" ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.08)" }}
               />
             </div>
 
-            {/* Password Field */}
+            {/* Password */}
             <div style={s.field}>
               <label style={{
-                ...s.floatLabel,
-                color: focused === "password" ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
-                transform: formData.password || focused === "password" ? "translateY(-20px) scale(0.78)" : "translateY(0) scale(1)",
-              }}>
-                Password
-              </label>
-              <input
-                type={showPassword ? "text" : "password"} name="password" value={formData.password}
+                ...s.label,
+                top: formData.password || focused==="password" ? 9 : 19,
+                fontSize: formData.password || focused==="password" ? 11 : 15,
+                color: focused==="password" ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.35)",
+                letterSpacing: formData.password || focused==="password" ? 0.5 : 0,
+              }}>Password</label>
+              <input type={showPassword ? "text" : "password"} name="password" value={formData.password}
                 onChange={handleChange}
-                onFocus={() => setFocused("password")}
-                onBlur={() => setFocused("")}
+                onFocus={() => setFocused("password")} onBlur={() => setFocused("")}
                 disabled={loading} required
-                style={{ ...s.input, paddingRight: 48, borderColor: focused === "password" ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.1)" }}
+                style={{ ...s.input, paddingRight:50, borderColor: focused==="password" ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.08)" }}
               />
               <button type="button" onClick={() => setShowPassword(p => !p)} style={s.eyeBtn}>
-                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                {showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}
               </button>
             </div>
 
             {/* Forgot */}
-            <div style={{ textAlign: "right", marginTop: -8 }}>
-              <button type="button" onClick={handleForgotPassword} disabled={loading} style={s.forgotBtn}>
-                Forgot password?
-              </button>
+            <div style={{ textAlign:"right", marginTop:-4 }}>
+              <button type="button" onClick={handleForgotPassword} disabled={loading} style={s.forgotBtn}>Forgot password?</button>
             </div>
 
             {/* Submit */}
-            <button type="submit" disabled={loading} style={s.submitBtn} className="submit-btn">
+            <button type="submit" disabled={loading} style={s.submitBtn} className="login-submit">
               {loading
-                ? <span style={s.btnInner}><span className="spinner-dark" />Signing in...</span>
+                ? <span style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:10 }}>
+                    <span style={s.btnSpin} />Signing in...
+                  </span>
                 : "Sign in"
               }
             </button>
+
           </form>
 
           {/* Divider */}
-          <div style={s.divider}>
-            <span style={s.divLine} />
-            <span style={s.divLabel}>or continue with</span>
-            <span style={s.divLine} />
+          <div style={{ display:"flex", alignItems:"center", gap:14, margin:"28px 0" }}>
+            <span style={{ flex:1, height:1, background:"rgba(255,255,255,0.07)" }} />
+            <span style={{ color:"rgba(255,255,255,0.25)", fontSize:12, letterSpacing:0.5 }}>or continue with</span>
+            <span style={{ flex:1, height:1, background:"rgba(255,255,255,0.07)" }} />
           </div>
 
           {/* Social */}
-          <div style={s.socialRow}>
-            {[
-              {
-                label: "Google",
-                icon: (
-                  <svg width="17" height="17" viewBox="0 0 24 24">
-                    <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                  </svg>
-                ),
-              },
-              {
-                label: "GitHub",
-                icon: (
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
-                  </svg>
-                ),
-              },
-            ].map(({ label, icon }) => (
-              <button key={label} style={s.socialBtn} className="social-btn">
-                {icon}
-                {label}
-              </button>
-            ))}
+          <div style={{ display:"flex", gap:12 }}>
+            <button style={s.socialBtn} className="social-btn">
+              <svg width="17" height="17" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Google
+            </button>
+            <button style={s.socialBtn} className="social-btn">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+              </svg>
+              Apple
+            </button>
           </div>
 
         </div>
@@ -1100,140 +1032,71 @@ const Login = () => {
 
 const s = {
   root: {
-    display: "flex",
-    minHeight: "100vh",
-    backgroundColor: "#080808",
+    display: "flex", minHeight: "100vh",
+    backgroundColor: "#0c0c0e",
     fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif",
   },
-  loadingScreen: {
-    display: "flex", flexDirection: "column",
-    alignItems: "center", justifyContent: "center",
-    minHeight: "100vh", backgroundColor: "#080808", gap: 16,
-  },
-  loadingText: { color: "rgba(255,255,255,0.3)", fontSize: 13, letterSpacing: 1 },
 
   // Left
-  leftPanel: {
-    flex: "0 0 52%",
-    position: "relative",
-    overflow: "hidden",
-    display: "none",
+  left: { flex:"0 0 48%", position:"relative", overflow:"hidden" },
+  imgOverlay: {
+    position:"absolute", inset:0,
+    background:"linear-gradient(to top, rgba(0,0,0,0.93) 0%, rgba(0,0,0,0.15) 55%, rgba(0,0,0,0.5) 100%)",
   },
-  slide: { position: "absolute", inset: 0, transition: "opacity 1.6s ease" },
-  slideImg: { width: "100%", height: "100%", objectFit: "cover" },
-  slideOverlay: {
-    position: "absolute", inset: 0,
-    background: "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.25) 55%, rgba(0,0,0,0.45) 100%)",
+  badge: {
+    position:"absolute", top:24, left:24, zIndex:10,
+    display:"flex", alignItems:"center", gap:8,
+    backgroundColor:"rgba(255,255,255,0.1)",
+    backdropFilter:"blur(12px)",
+    borderRadius:20, padding:"7px 14px",
+    border:"1px solid rgba(255,255,255,0.15)",
   },
-  dots: {
-    position: "absolute", bottom: 148, left: "50%",
-    transform: "translateX(-50%)", display: "flex", gap: 8, zIndex: 10,
-  },
-  dot: {
-    height: 8, borderRadius: 4, backgroundColor: "white",
-    border: "none", cursor: "pointer", padding: 0, transition: "all 0.3s ease",
-  },
-  quoteBox: { position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 52px 60px", zIndex: 10 },
-  quoteText: { color: "white", fontSize: 21, fontWeight: 300, fontStyle: "italic", lineHeight: 1.55, marginBottom: 14, letterSpacing: "-0.2px" },
-  quoteAuthor: { color: "rgba(255,255,255,0.5)", fontSize: 13, letterSpacing: 0.8, fontWeight: 500, textTransform: "uppercase" },
+  badgeDot: { width:7, height:7, borderRadius:"50%", backgroundColor:"#4ade80" },
+  badgeLabel: { color:"white", fontSize:13, fontWeight:600, letterSpacing:0.3 },
+  quoteBox: { position:"absolute", bottom:72, left:0, right:0, padding:"0 40px", zIndex:10 },
+  quoteText: { color:"white", fontSize:19, fontWeight:300, fontStyle:"italic", lineHeight:1.6, marginBottom:14 },
+  quoteAuthor: { color:"rgba(255,255,255,0.45)", fontSize:12, letterSpacing:1.5, fontWeight:600, textTransform:"uppercase" },
+  dots: { position:"absolute", bottom:28, left:"50%", transform:"translateX(-50%)", display:"flex", gap:8, zIndex:10 },
+  dot: { height:8, borderRadius:4, backgroundColor:"white", border:"none", cursor:"pointer", padding:0, transition:"all 0.3s ease" },
 
   // Right
-  rightPanel: {
-    flex: 1,
-    display: "flex", alignItems: "center", justifyContent: "center",
-    padding: "48px 28px",
-    background: "radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.03) 0%, transparent 60%), #080808",
+  right: {
+    flex:1, display:"flex", alignItems:"center", justifyContent:"center",
+    padding:"48px 32px",
+    background:"radial-gradient(ellipse at 20% 20%, rgba(255,255,255,0.025) 0%, transparent 60%), #0c0c0e",
   },
-  card: { width: "100%", maxWidth: 392 },
-  logo: { marginBottom: 36 },
-  title: { color: "white", fontSize: 30, fontWeight: 600, letterSpacing: "-0.7px", marginBottom: 8, lineHeight: 1.2 },
-  subtitle: { color: "rgba(255,255,255,0.38)", fontSize: 14.5, marginBottom: 36 },
-  inlineLink: {
-    background: "none", border: "none", color: "rgba(255,255,255,0.8)",
-    fontSize: 14.5, cursor: "pointer", textDecoration: "underline",
-    textDecorationColor: "rgba(255,255,255,0.25)", padding: 0,
-  },
-  form: { display: "flex", flexDirection: "column", gap: 18 },
-  field: { position: "relative" },
-  floatLabel: {
-    position: "absolute", left: 16, top: 18, fontSize: 15,
-    pointerEvents: "none", transition: "all 0.18s ease",
-    transformOrigin: "left center", zIndex: 1, lineHeight: 1,
-  },
+  card: { width:"100%", maxWidth:380 },
+  title: { color:"white", fontSize:30, fontWeight:600, letterSpacing:"-0.7px", marginBottom:8 },
+  sub: { color:"rgba(255,255,255,0.35)", fontSize:14.5, marginBottom:36 },
+  linkBtn: { background:"none", border:"none", color:"rgba(255,255,255,0.75)", fontSize:14.5, cursor:"pointer", textDecoration:"underline", textDecorationColor:"rgba(255,255,255,0.2)", padding:0 },
+  field: { position:"relative" },
+  label: { position:"absolute", left:16, zIndex:1, pointerEvents:"none", transition:"all 0.18s ease" },
   input: {
-    width: "100%", backgroundColor: "rgba(255,255,255,0.04)",
-    border: "1px solid", borderRadius: 14,
-    color: "white", fontSize: 15,
-    padding: "24px 16px 10px",
-    outline: "none", transition: "border-color 0.2s ease",
-    boxSizing: "border-box",
+    width:"100%", backgroundColor:"rgba(255,255,255,0.05)",
+    border:"1px solid", borderRadius:14, color:"white", fontSize:15,
+    padding:"26px 16px 10px", outline:"none",
+    transition:"border-color 0.2s ease", boxSizing:"border-box",
   },
-  eyeBtn: {
-    position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)",
-    background: "none", border: "none", color: "rgba(255,255,255,0.35)",
-    cursor: "pointer", padding: 4, display: "flex", alignItems: "center",
-  },
-  forgotBtn: {
-    background: "none", border: "none", color: "rgba(255,255,255,0.35)",
-    fontSize: 13, cursor: "pointer", padding: 0, letterSpacing: 0.1,
-  },
-  submitBtn: {
-    width: "100%", padding: "15px",
-    backgroundColor: "white", color: "#000",
-    border: "none", borderRadius: 14,
-    fontSize: 15, fontWeight: 600,
-    cursor: "pointer", letterSpacing: "-0.2px",
-    transition: "all 0.18s ease", marginTop: 6,
-  },
-  btnInner: { display: "flex", alignItems: "center", justifyContent: "center", gap: 10 },
-  divider: { display: "flex", alignItems: "center", gap: 14, margin: "28px 0" },
-  divLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.07)" },
-  divLabel: { color: "rgba(255,255,255,0.25)", fontSize: 12, letterSpacing: 0.5, whiteSpace: "nowrap" },
-  socialRow: { display: "flex", gap: 12 },
-  socialBtn: {
-    flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-    padding: "13px 16px",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: 14, color: "rgba(255,255,255,0.65)",
-    fontSize: 14, fontWeight: 500, cursor: "pointer",
-    transition: "all 0.18s ease", letterSpacing: 0.1,
-  },
+  eyeBtn: { position:"absolute", right:14, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"rgba(255,255,255,0.35)", cursor:"pointer", padding:4, display:"flex", alignItems:"center" },
+  forgotBtn: { background:"none", border:"none", color:"rgba(255,255,255,0.3)", fontSize:13, cursor:"pointer", padding:0 },
+  submitBtn: { width:"100%", padding:"15px", backgroundColor:"white", color:"#000", border:"none", borderRadius:14, fontSize:15, fontWeight:600, cursor:"pointer", transition:"all 0.18s ease", marginTop:4 },
+  btnSpin: { display:"inline-block", width:15, height:15, border:"2px solid rgba(0,0,0,0.15)", borderTop:"2px solid #000", borderRadius:"50%", animation:"spin 0.75s linear infinite" },
+  socialBtn: { flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:10, padding:"13px 16px", backgroundColor:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:14, color:"rgba(255,255,255,0.65)", fontSize:14, fontWeight:500, cursor:"pointer", transition:"all 0.18s ease" },
 };
 
 const css = `
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .spinner {
-    width: 30px; height: 30px;
-    border: 2px solid rgba(255,255,255,0.08);
-    border-top-color: white;
-    border-radius: 50%;
-    animation: spin 0.75s linear infinite;
+  @media (max-width: 768px) {
+    [style*="flex: 0 0 48%"] { display: none !important; }
   }
 
-  .spinner-dark {
-    display: inline-block;
-    width: 15px; height: 15px;
-    border: 2px solid rgba(0,0,0,0.15);
-    border-top-color: #000;
-    border-radius: 50%;
-    animation: spin 0.75s linear infinite;
-  }
-
-  @media (min-width: 960px) {
-    [data-left] { display: block !important; }
-  }
-
-  .submit-btn:hover:not(:disabled) {
-    background-color: #e8e8e8 !important;
+  .login-submit:hover:not(:disabled) {
+    background-color: #e5e5e5 !important;
     transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(255,255,255,0.12);
+    box-shadow: 0 8px 24px rgba(255,255,255,0.1);
   }
-
-  .submit-btn:active:not(:disabled) {
-    transform: translateY(0) !important;
-  }
+  .login-submit:active:not(:disabled) { transform: translateY(0) !important; }
 
   .social-btn:hover {
     background-color: rgba(255,255,255,0.08) !important;
@@ -1242,11 +1105,11 @@ const css = `
   }
 
   input:-webkit-autofill {
-    -webkit-box-shadow: 0 0 0 1000px #0f0f0f inset !important;
+    -webkit-box-shadow: 0 0 0 1000px #131316 inset !important;
     -webkit-text-fill-color: white !important;
   }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; }
 `;
 
 export default Login;
