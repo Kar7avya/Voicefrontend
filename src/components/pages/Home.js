@@ -144,7 +144,7 @@ const FEATURES = [
       </svg>
     ),
     title: "Filler Word Mastery",
-    desc: "Identify and eliminate "um," "uh," and other disfluencies with precise tracking and session-over-session trend data.",
+    desc: 'Identify and eliminate "um," "uh," and other disfluencies with precise tracking and session-over-session trend data.',
   },
   {
     icon: (
