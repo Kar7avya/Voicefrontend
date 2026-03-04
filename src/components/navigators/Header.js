@@ -24,8 +24,16 @@ const Header = () => {
       <nav className="navbar-pill">
         {/* Brand */}
         <NavLink className="navbar-brand" to="/">
-          <span className="brand-icon">🔊</span>
-          <span className="brand-name">VoiceAI</span>
+          <span className="brand-icon">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+    <rect x="9" y="1" width="6" height="10" rx="3" fill="white"/>
+    <path d="M5 10a7 7 0 0014 0" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round"/>
+    <line x1="12" y1="17" x2="12" y2="21" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+    <line x1="8" y1="21" x2="16" y2="21" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+    <line x1="12" y1="21" x2="7" y2="23" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+</span>
+          <span className="brand-name">SpeakMasterAI</span>
         </NavLink>
 
         {/* Desktop Links */}
