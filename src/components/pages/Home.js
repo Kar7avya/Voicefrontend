@@ -470,18 +470,21 @@
 //     </div>
 //   );
 // }
-
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-// ─── ORBITAL TIMELINE DATA ────────────────────────────────────────────────────
+// ─── TIMELINE DATA — each step has a page, route, and what you do there ───────
 const TIMELINE_DATA = [
   {
     id: 1,
-    title: "Sign Up",
     step: "Step 1",
-    content: "Create your free account in seconds. No credit card needed. Just your email and a password.",
-    tip: "Already have an account? Just sign in and you're good to go.",
+    title: "Create Your Account",
+    page: "Login / Sign Up",
+    route: "/login",
+    pageBadgeColor: "#007AFF",
+    content: "Go to the Login page. Click 'Sign Up', enter your email and a password. That's it — you're in. No credit card needed.",
+    whatYouSee: "A simple sign-in form. Fill it in and press Sign Up.",
+    tip: "Already signed up before? Just enter your email and password and press Sign In.",
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -493,10 +496,14 @@ const TIMELINE_DATA = [
   },
   {
     id: 2,
-    title: "Record or Upload",
     step: "Step 2",
-    content: "Record yourself giving a speech or upload an existing video/audio file. Supported: MP4, MOV, AVI, MP3, WAV up to 500MB.",
-    tip: "Even a 2-minute practice run gives you great feedback. Start small!",
+    title: "Upload Your Speech",
+    page: "Upload Page",
+    route: "/upload",
+    pageBadgeColor: "#34C759",
+    content: "Go to the Upload page. Drag and drop your video or audio file, or click to browse. Supported formats: MP4, MOV, AVI, MP3, WAV — up to 500MB.",
+    whatYouSee: "A big drag-and-drop box. Just drop your file there and the AI starts automatically.",
+    tip: "No video? You can also paste text directly on this page and still get AI feedback on your words.",
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -508,13 +515,17 @@ const TIMELINE_DATA = [
   },
   {
     id: 3,
-    title: "AI Transcribes",
     step: "Step 3",
-    content: "Our AI uses ElevenLabs and Deepgram to turn your speech into text automatically. You don't have to type anything.",
-    tip: "Two transcription engines run at the same time for maximum accuracy.",
+    title: "AI Processes It",
+    page: "Upload Page",
+    route: "/upload",
+    pageBadgeColor: "#FF9F0A",
+    content: "After you upload, stay on the Upload page. A progress bar shows what is happening: uploading, transcribing, analysing frames, then Gemini AI coaching. This takes 30–90 seconds.",
+    whatYouSee: "A spinning loader and progress percentage. You do not need to do anything — just wait.",
+    tip: "Do not close the page while it is processing. Results appear right below when done.",
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
     relatedIds: [2, 4],
@@ -523,13 +534,17 @@ const TIMELINE_DATA = [
   },
   {
     id: 4,
-    title: "Get AI Feedback",
     step: "Step 4",
-    content: "Google Gemini AI reads your transcript and gives you personal coaching — what you did well, what to improve, and exactly how.",
-    tip: "The feedback is written in plain English, not technical jargon.",
+    title: "Read Your Results",
+    page: "Dashboard",
+    route: "/dashboard",
+    pageBadgeColor: "#BF5AF2",
+    content: "Go to your Dashboard. Here you see your fluency score, words per minute, how many filler words you used, your full transcript, and personal AI coaching written in plain English.",
+    whatYouSee: "Score cards at the top, your video player, your transcript below, and an AI coaching section. All of your past uploads are saved here too.",
+    tip: "The AI coaching section tells you exactly what to work on next. Read it carefully — it is personalised to your speech.",
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
       </svg>
     ),
     relatedIds: [3, 5],
@@ -538,13 +553,18 @@ const TIMELINE_DATA = [
   },
   {
     id: 5,
-    title: "See Your Scores",
     step: "Step 5",
-    content: "Your Dashboard shows your fluency score, words per minute, filler word count, and a full transcript. All in one place.",
-    tip: "Check your score after every session. Even 1% improvement a week adds up fast.",
+    title: "Practice with Teleprompter",
+    page: "Teleprompter",
+    route: "/teleprompter",
+    pageBadgeColor: "#FF3B30",
+    content: "Go to the Teleprompter page. Paste your speech script and it scrolls automatically while you speak — so you never lose your place or forget your words.",
+    whatYouSee: "A large scrolling text area. You control the speed with a slider. Great for rehearsing before a presentation.",
+    tip: "Use this to practise the speech you plan to upload next. Then upload the recording and compare your scores.",
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
       </svg>
     ),
     relatedIds: [4, 6],
@@ -553,16 +573,20 @@ const TIMELINE_DATA = [
   },
   {
     id: 6,
-    title: "Practice & Improve",
     step: "Step 6",
-    content: "Use the Teleprompter to practice reading scripts smoothly. Use TTS to hear how AI voices sound. Keep uploading to track your growth.",
-    tip: "Most users see clear improvement after just 3 sessions. Keep going!",
+    title: "Try Text-to-Speech",
+    page: "TTS Page",
+    route: "/tts",
+    pageBadgeColor: "#30D158",
+    content: "Go to the TTS page. Type any text and hear it spoken in a natural AI voice. Use this to hear how your script sounds before you record yourself saying it.",
+    whatYouSee: "A text box and a Play button. Type your speech, press play, and listen to an AI read it back to you.",
+    tip: "Listen to the AI read your script, then try to match that pace and tone when you record yourself on the Upload page.",
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M12 6v12m-3.536-9.536a5 5 0 000 7.072M6.343 6.343a8 8 0 000 11.314" />
       </svg>
     ),
-    relatedIds: [5, 1],
+    relatedIds: [5, 2],
     color: "#30D158",
     energy: 95,
   },
@@ -575,11 +599,12 @@ function OrbitalTimeline({ data }) {
   const [autoRotate, setAutoRotate] = useState(true);
   const containerRef = useRef(null);
   const timerRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (autoRotate) {
       timerRef.current = setInterval(() => {
-        setRotation(prev => (prev + 0.4) % 360);
+        setRotation(prev => (prev + 0.35) % 360);
       }, 50);
     }
     return () => clearInterval(timerRef.current);
@@ -592,13 +617,6 @@ function OrbitalTimeline({ data }) {
     } else {
       setExpandedId(id);
       setAutoRotate(false);
-    }
-  };
-
-  const handleBgClick = (e) => {
-    if (e.target === containerRef.current) {
-      setExpandedId(null);
-      setAutoRotate(true);
     }
   };
 
@@ -618,13 +636,18 @@ function OrbitalTimeline({ data }) {
   return (
     <div
       ref={containerRef}
-      onClick={handleBgClick}
-      className="relative w-full flex items-center justify-center"
+      onClick={(e) => {
+        if (e.target === containerRef.current) {
+          setExpandedId(null);
+          setAutoRotate(true);
+        }
+      }}
+      className="relative w-full flex items-center justify-center select-none"
       style={{ height: "520px" }}
     >
-      {/* Orbit ring */}
+      {/* Orbit rings */}
       <div className="absolute w-[340px] h-[340px] rounded-full border border-[#E8E8ED] pointer-events-none" />
-      <div className="absolute w-[280px] h-[280px] rounded-full border border-[#F2F2F7] pointer-events-none" />
+      <div className="absolute w-[240px] h-[240px] rounded-full border border-[#F2F2F7] pointer-events-none" />
 
       {/* Center hub */}
       <div className="absolute z-10 flex flex-col items-center justify-center w-20 h-20 rounded-full bg-[#1D1D1F] shadow-xl pointer-events-none">
@@ -632,7 +655,7 @@ function OrbitalTimeline({ data }) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
             d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
         </svg>
-        <span className="text-white text-[9px] uppercase tracking-widest font-semibold">You</span>
+        <span className="text-white/50 text-[9px] uppercase tracking-widest font-semibold">Start</span>
       </div>
 
       {/* Nodes */}
@@ -652,33 +675,22 @@ function OrbitalTimeline({ data }) {
               opacity: isExpanded ? 1 : pos.opacity,
             }}
           >
-            {/* Node circle */}
-            <div className={`
-              relative w-11 h-11 rounded-full flex items-center justify-center
-              border-2 transition-all duration-300 shadow-sm
-              ${isExpanded
-                ? "scale-125 shadow-lg"
-                : isRelated
-                  ? "scale-110 animate-pulse"
-                  : "scale-100 hover:scale-110"
-              }
-            `}
+            {/* Node */}
+            <div
+              className={`w-11 h-11 rounded-full flex items-center justify-center border-2 transition-all duration-300
+                ${isExpanded ? "scale-125 shadow-lg" : isRelated ? "scale-110" : "hover:scale-110"}`}
               style={{
                 backgroundColor: isExpanded ? item.color : "#fff",
                 borderColor: item.color,
                 color: isExpanded ? "#fff" : item.color,
-                boxShadow: isExpanded ? `0 0 20px ${item.color}40` : undefined,
+                boxShadow: isExpanded ? `0 0 24px ${item.color}50` : undefined,
               }}
             >
               {item.icon}
             </div>
 
-            {/* Label below node */}
-            <div className={`
-              absolute top-13 left-1/2 -translate-x-1/2 whitespace-nowrap text-center mt-2
-              transition-all duration-300
-              ${isExpanded ? "opacity-100" : "opacity-70"}
-            `} style={{ top: "48px" }}>
+            {/* Label */}
+            <div className="absolute text-center whitespace-nowrap" style={{ top: "50px", left: "50%", transform: "translateX(-50%)" }}>
               <p className="text-[#1D1D1F] text-[11px] font-semibold">{item.title}</p>
               <p className="text-[#AEAEB2] text-[10px]">{item.step}</p>
             </div>
@@ -686,141 +698,127 @@ function OrbitalTimeline({ data }) {
             {/* Expanded card */}
             {isExpanded && (
               <div
-                className="absolute bg-white border border-[#E8E8ED] rounded-2xl shadow-xl p-4 w-64"
-                style={{
-                  top: "64px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  zIndex: 300,
-                }}
+                className="absolute bg-white border border-[#E8E8ED] rounded-2xl shadow-2xl overflow-hidden"
+                style={{ width: "272px", top: "64px", left: "50%", transform: "translateX(-50%)", zIndex: 300 }}
                 onClick={e => e.stopPropagation()}
               >
-                {/* Connector line */}
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-px h-3 bg-[#E8E8ED]" />
+                {/* Color top bar */}
+                <div className="h-1 w-full" style={{ backgroundColor: item.color }} />
 
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full text-white"
-                    style={{ backgroundColor: item.color }}>
-                    {item.step}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <div className="h-1 w-16 bg-[#F2F2F7] rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-700"
-                        style={{ width: `${item.energy}%`, backgroundColor: item.color }} />
-                    </div>
-                    <span className="text-[#AEAEB2] text-[10px] font-mono">{item.energy}%</span>
+                <div className="p-4">
+                  {/* Page badge + step */}
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full text-white"
+                      style={{ backgroundColor: item.color }}>
+                      {item.step}
+                    </span>
+                    <span className="text-[11px] font-semibold text-[#1D1D1F] bg-[#F5F5F7] border border-[#E8E8ED] px-2.5 py-1 rounded-full flex items-center gap-1">
+                      <svg className="w-3 h-3 text-[#6E6E73]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                      {item.page}
+                    </span>
                   </div>
-                </div>
 
-                <h4 className="text-[#1D1D1F] text-sm font-bold mb-2">{item.title}</h4>
-                <p className="text-[#3A3A3C] text-xs leading-relaxed mb-3">{item.content}</p>
+                  {/* Title */}
+                  <h4 className="text-[#1D1D1F] text-sm font-bold mb-2">{item.title}</h4>
 
-                {/* Tip */}
-                <div className="bg-[#F5F5F7] rounded-xl p-3">
-                  <p className="text-[#6E6E73] text-[11px] leading-relaxed">
-                    <span className="font-semibold text-[#1D1D1F]">Tip: </span>
-                    {item.tip}
-                  </p>
-                </div>
+                  {/* What to do */}
+                  <p className="text-[#3A3A3C] text-xs leading-relaxed mb-3">{item.content}</p>
 
-                {/* Related nodes */}
-                {item.relatedIds.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-[#F2F2F7]">
-                    <p className="text-[#AEAEB2] text-[10px] uppercase tracking-widest font-medium mb-2">Connected steps</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {item.relatedIds.map(rid => {
-                        const rel = data.find(d => d.id === rid);
-                        return rel ? (
-                          <button
-                            key={rid}
-                            onClick={(e) => { e.stopPropagation(); handleNodeClick(rid); }}
-                            className="text-[11px] font-medium px-2.5 py-1 rounded-lg border border-[#E8E8ED]
-                              text-[#1D1D1F] hover:bg-[#F5F5F7] transition-colors duration-150 flex items-center gap-1"
-                          >
-                            {rel.title}
-                            <svg className="w-2.5 h-2.5 text-[#AEAEB2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </button>
-                        ) : null;
-                      })}
-                    </div>
+                  {/* What you see */}
+                  <div className="bg-[#F5F5F7] rounded-xl p-3 mb-3">
+                    <p className="text-[#AEAEB2] text-[10px] uppercase tracking-widest font-semibold mb-1">What you will see</p>
+                    <p className="text-[#3A3A3C] text-xs leading-relaxed">{item.whatYouSee}</p>
                   </div>
-                )}
+
+                  {/* Tip */}
+                  <div className="border border-[#E8E8ED] rounded-xl p-3 mb-3">
+                    <p className="text-[#6E6E73] text-xs leading-relaxed">
+                      <span className="font-semibold text-[#1D1D1F]">Tip: </span>{item.tip}
+                    </p>
+                  </div>
+
+                  {/* Go to page button */}
+                  <button
+                    onClick={() => navigate(item.route)}
+                    className="w-full py-2.5 rounded-xl text-white text-xs font-semibold flex items-center justify-center gap-2 transition-opacity hover:opacity-90 active:scale-95"
+                    style={{ backgroundColor: item.color }}
+                  >
+                    Go to {item.page}
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                  </button>
+
+                  {/* Related steps */}
+                  {item.relatedIds.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-[#F2F2F7]">
+                      <p className="text-[#AEAEB2] text-[10px] uppercase tracking-widest font-medium mb-2">Next steps</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {item.relatedIds.map(rid => {
+                          const rel = data.find(d => d.id === rid);
+                          return rel ? (
+                            <button
+                              key={rid}
+                              onClick={(e) => { e.stopPropagation(); handleNodeClick(rid); }}
+                              className="text-[11px] font-medium px-2.5 py-1 rounded-lg border border-[#E8E8ED] text-[#1D1D1F] hover:bg-[#F5F5F7] transition-colors flex items-center gap-1"
+                            >
+                              {rel.step}: {rel.title}
+                              <svg className="w-2.5 h-2.5 text-[#AEAEB2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </button>
+                          ) : null;
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
         );
       })}
 
-      {/* Hint text */}
       {!expandedId && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none">
-          <p className="text-[#AEAEB2] text-xs text-center">Tap any step to learn more</p>
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 pointer-events-none">
+          <p className="text-[#AEAEB2] text-xs text-center">Tap any step to see which page to go to</p>
         </div>
       )}
     </div>
   );
 }
 
-// ─── FEATURE / STATS DATA ─────────────────────────────────────────────────────
+// ─── FEATURES ─────────────────────────────────────────────────────────────────
 const FEATURES = [
   {
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-          d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-      </svg>
-    ),
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>),
     title: "Filler Word Mastery",
     desc: 'Identify and eliminate "um" and "uh" disfluencies with precise tracking and session-over-session trend data.',
   },
   {
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>),
     title: "Body Language Insights",
     desc: "AI-powered analysis of gestures, posture, and movement patterns to strengthen your non-verbal communication.",
   },
   {
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-      </svg>
-    ),
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>),
     title: "Confidence Analytics",
     desc: "Track vocal tone, pacing, and delivery strength with detailed scoring and improvement trends over time.",
   },
   {
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-      </svg>
-    ),
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>),
     title: "Real-Time Transcription",
     desc: "Dual-engine transcription via ElevenLabs and Deepgram — word-perfect transcripts within seconds of upload.",
   },
   {
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-      </svg>
-    ),
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>),
     title: "Gemini AI Coaching",
     desc: "Personalized feedback powered by Google Gemini — contextual, actionable, tailored to your delivery.",
   },
   {
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-          d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
-      </svg>
-    ),
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg>),
     title: "Frame-by-Frame Analysis",
     desc: "Visual AI scans every key moment of your video — posture, expression, and slide alignment reviewed automatically.",
   },
@@ -833,7 +831,7 @@ const STATS = [
   { value: "500MB", label: "Max file size" },
 ];
 
-// ─── MAIN HOME COMPONENT ──────────────────────────────────────────────────────
+// ─── HOME ─────────────────────────────────────────────────────────────────────
 export default function Home() {
   const navigate = useNavigate();
 
@@ -842,8 +840,7 @@ export default function Home() {
 
       {/* ── HERO ──────────────────────────────────────────────────────── */}
       <section className="relative min-h-screen bg-[#0A0A0F] overflow-hidden flex items-center">
-        <div
-          className="absolute inset-0 z-0 bg-cover bg-center opacity-20"
+        <div className="absolute inset-0 z-0 bg-cover bg-center opacity-20"
           style={{
             backgroundImage: "url('https://images.unsplash.com/photo-1475721027785-f74eccf877e2?auto=format&fit=crop&w=1920&q=80')",
             maskImage: "linear-gradient(180deg, black 0%, black 60%, transparent 100%)",
@@ -854,6 +851,7 @@ export default function Home() {
 
         <div className="relative z-10 max-w-6xl mx-auto px-6 pt-32 pb-24 w-full">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+
             <div className="lg:col-span-7 space-y-8">
               <div className="inline-flex items-center gap-2 border border-white/10 bg-white/5 rounded-full px-4 py-1.5 backdrop-blur-md">
                 <span className="relative flex h-2 w-2">
@@ -875,19 +873,15 @@ export default function Home() {
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={() => navigate("/upload")}
-                  className="inline-flex items-center justify-center gap-2 bg-white text-[#1D1D1F] text-sm font-semibold px-7 py-3.5 rounded-full hover:bg-white/90 active:scale-95 transition-all duration-150"
-                >
+                <button onClick={() => navigate("/upload")}
+                  className="inline-flex items-center justify-center gap-2 bg-white text-[#1D1D1F] text-sm font-semibold px-7 py-3.5 rounded-full hover:bg-white/90 active:scale-95 transition-all duration-150">
                   Get started — it is free
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                   </svg>
                 </button>
-                <button
-                  onClick={() => window.open("https://www.youtube.com/results?search_query=public+speaking+demo", "_blank")}
-                  className="inline-flex items-center justify-center gap-2 border border-white/10 bg-white/5 text-white text-sm font-semibold px-7 py-3.5 rounded-full hover:bg-white/10 backdrop-blur-sm transition-all duration-150"
-                >
+                <button onClick={() => window.open("https://www.youtube.com/results?search_query=public+speaking+demo", "_blank")}
+                  className="inline-flex items-center justify-center gap-2 border border-white/10 bg-white/5 text-white text-sm font-semibold px-7 py-3.5 rounded-full hover:bg-white/10 backdrop-blur-sm transition-all duration-150">
                   <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
                   Watch demo
                 </button>
@@ -899,8 +893,7 @@ export default function Home() {
                 <div className="flex items-center gap-4 mb-8">
                   <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center">
                     <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                   </div>
                   <div>
@@ -955,42 +948,63 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── ORBITAL TIMELINE — HOW TO USE ──────────────────────────────── */}
+      {/* ── HOW TO USE — ORBITAL TIMELINE ──────────────────────────────── */}
       <section className="py-20 px-6 bg-white border-t border-[#E8E8ED]">
         <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-4">
-            <p className="text-[#AEAEB2] text-xs uppercase tracking-widest font-medium mb-2">Your journey</p>
-            <h2 className="text-[#1D1D1F] text-3xl font-bold tracking-tight mb-3">
-              How to use SpeakMasterAI
-            </h2>
-            <p className="text-[#6E6E73] text-base max-w-md mx-auto leading-relaxed">
-              Six simple steps — no technical knowledge needed.
-              Tap any step on the orbit to learn what happens and what you need to do.
+          <div className="text-center mb-6">
+            <p className="text-[#AEAEB2] text-xs uppercase tracking-widest font-medium mb-2">Complete guide</p>
+            <h2 className="text-[#1D1D1F] text-3xl font-bold tracking-tight mb-3">How to use SpeakMasterAI</h2>
+            <p className="text-[#6E6E73] text-base max-w-lg mx-auto leading-relaxed">
+              Six steps in order. Tap any step on the orbit to see exactly which page to go to,
+              what you will see there, and what to do.
             </p>
           </div>
 
-          {/* Orbital timeline */}
+          {/* Orbital */}
           <OrbitalTimeline data={TIMELINE_DATA} />
 
-          {/* Step list below for clarity on mobile */}
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {/* Step-by-step list — clear for everyone */}
+          <div className="mt-6 space-y-3">
+            <p className="text-[#AEAEB2] text-xs uppercase tracking-widest font-medium px-1 mb-4">Follow this order</p>
             {TIMELINE_DATA.map((item) => (
-              <div key={item.id} className="flex items-start gap-3 bg-[#F5F5F7] rounded-2xl p-4">
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
-                  style={{ backgroundColor: item.color + "20", color: item.color }}>
-                  {item.icon}
+              <div key={item.id}
+                className="flex items-center gap-4 bg-[#F5F5F7] hover:bg-white border border-transparent hover:border-[#E8E8ED] rounded-2xl p-4 transition-all duration-150 group">
+                {/* Step number */}
+                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold"
+                  style={{ backgroundColor: item.color }}>
+                  {item.id}
                 </div>
-                <div>
-                  <p className="text-[#AEAEB2] text-[10px] uppercase tracking-widest font-semibold mb-0.5">{item.step}</p>
-                  <p className="text-[#1D1D1F] text-sm font-semibold">{item.title}</p>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                    <p className="text-[#1D1D1F] text-sm font-semibold">{item.title}</p>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border text-white"
+                      style={{ backgroundColor: item.pageBadgeColor, borderColor: item.pageBadgeColor }}>
+                      {item.page}
+                    </span>
+                  </div>
+                  <p className="text-[#6E6E73] text-xs leading-relaxed truncate">{item.content}</p>
                 </div>
+
+                {/* Go button */}
+                <button
+                  onClick={() => navigate(item.route)}
+                  className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl text-white transition-opacity hover:opacity-80 active:scale-95"
+                  style={{ backgroundColor: item.color }}
+                >
+                  Open
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── FEATURES GRID ─────────────────────────────────────────────── */}
+      {/* ── FEATURES GRID ──────────────────────────────────────────────── */}
       <section className="py-20 px-6 bg-[#F5F5F7] border-t border-[#E8E8ED]">
         <div className="max-w-4xl mx-auto">
           <div className="mb-12">
@@ -1002,11 +1016,8 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {FEATURES.map((f, i) => (
-              <div key={i}
-                className="group bg-white hover:bg-white border border-[#E8E8ED] hover:border-[#C7C7CC]
-                  rounded-2xl p-6 transition-all duration-200 hover:shadow-sm cursor-default">
-                <div className="w-10 h-10 rounded-xl bg-[#F5F5F7] border border-[#E8E8ED] flex items-center justify-center
-                  text-[#6E6E73] group-hover:text-[#1D1D1F] group-hover:border-[#C7C7CC] transition-all duration-200 mb-4">
+              <div key={i} className="group bg-white border border-[#E8E8ED] hover:border-[#C7C7CC] rounded-2xl p-6 transition-all duration-200 hover:shadow-sm cursor-default">
+                <div className="w-10 h-10 rounded-xl bg-[#F5F5F7] border border-[#E8E8ED] flex items-center justify-center text-[#6E6E73] group-hover:text-[#1D1D1F] transition-all duration-200 mb-4">
                   {f.icon}
                 </div>
                 <h3 className="text-[#1D1D1F] text-sm font-semibold mb-2">{f.title}</h3>
@@ -1025,18 +1036,12 @@ export default function Home() {
             Upload your first presentation and get detailed AI feedback in under a minute. No credit card. No setup.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button
-              onClick={() => navigate("/upload")}
-              className="px-8 py-3.5 bg-[#1D1D1F] text-white text-sm font-semibold rounded-full
-                hover:bg-[#3A3A3C] active:scale-95 transition-all duration-150"
-            >
+            <button onClick={() => navigate("/upload")}
+              className="px-8 py-3.5 bg-[#1D1D1F] text-white text-sm font-semibold rounded-full hover:bg-[#3A3A3C] active:scale-95 transition-all duration-150">
               Upload your first presentation
             </button>
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="px-8 py-3.5 bg-[#F5F5F7] border border-[#E8E8ED] text-[#1D1D1F] text-sm font-semibold
-                rounded-full hover:bg-[#E8E8ED] active:scale-95 transition-all duration-150"
-            >
+            <button onClick={() => navigate("/dashboard")}
+              className="px-8 py-3.5 bg-[#F5F5F7] border border-[#E8E8ED] text-[#1D1D1F] text-sm font-semibold rounded-full hover:bg-[#E8E8ED] active:scale-95 transition-all duration-150">
               View dashboard
             </button>
           </div>
@@ -1049,9 +1054,7 @@ export default function Home() {
           <p className="text-[#AEAEB2] text-sm">© 2025 SpeakMasterAI. All rights reserved.</p>
           <div className="flex items-center gap-6">
             {["Privacy", "Terms", "Contact"].map(link => (
-              <button key={link} className="text-[#AEAEB2] text-sm hover:text-[#1D1D1F] transition-colors duration-150">
-                {link}
-              </button>
+              <button key={link} className="text-[#AEAEB2] text-sm hover:text-[#1D1D1F] transition-colors duration-150">{link}</button>
             ))}
           </div>
         </div>
