@@ -582,7 +582,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
 import { Mic, Play, Pause, Download, X, Check, Volume2, History, RefreshCw } from "lucide-react";
-import { EmotionDetectionPanel } from "@/components/ui/emotion-detection-panel";
+// ✅ replace with this (relative path from your file location)
+import { EmotionDetectionPanel } from "../ui/emotion-detection-panel";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const API = "https://kartavya11-smart-tts-api.hf.space";

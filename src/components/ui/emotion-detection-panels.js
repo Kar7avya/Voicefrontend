@@ -1,10 +1,10 @@
 "use client"
 
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
-import { LiquidCard, CardContent, CardHeader } from "@/components/ui/liquid-glass-card"
-import { LiquidButton } from "@/components/ui/liquid-glass-button"
-import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
+// ✅ after
+import { LiquidCard, CardContent, CardHeader } from "./liquid-glass-card";
+import { LiquidButton } from "./liquid-glass-button";
+import { Badge } from "./badge";
+import { cn } from "../../lib/utils";
 
 // ─── Emotion metadata ─────────────────────────────────────────────────────────
 
