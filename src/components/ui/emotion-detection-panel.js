@@ -25,9 +25,13 @@ const EMOTION_META = {
   surprised:    { emoji: "😲", color: "#fbbf24", bg: "#422006", label: "Surprised"    },
   hopeful:      { emoji: "🌟", color: "#34d399", bg: "#022c22", label: "Hopeful"      },
   sarcastic:    { emoji: "😏", color: "#a78bfa", bg: "#2e1065", label: "Sarcastic"    },
+  worried:      { emoji: "😟", color: "#fb923c", bg: "#431407", label: "Worried"      },
+  excited:      { emoji: "🎉", color: "#f472b6", bg: "#4a044e", label: "Excited"      },
+  proud:        { emoji: "🦁", color: "#fbbf24", bg: "#422006", label: "Proud"        },
+  caring:       { emoji: "🤗", color: "#34d399", bg: "#022c22", label: "Caring"       },
 };
 
-// ─── Counter context (staggered animations) ────────────────────────────────────
+// ─── Counter context ───────────────────────────────────────────────────────────
 const CounterContext = createContext(undefined);
 function CounterProvider({ children }) {
   const ref = useRef(0);
@@ -40,7 +44,7 @@ function useCounter() {
   return ctx.getNextIndex;
 }
 
-// ─── API call 1: Overall session emotion ───────────────────────────────────────
+// ─── API 1: Overall emotion ────────────────────────────────────────────────────
 async function detectEmotion(transcript) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -51,84 +55,96 @@ async function detectEmotion(transcript) {
       messages: [{
         role: "user",
         content: `Analyse the emotional tone of this speech transcript.
-Return ONLY a valid JSON object. No markdown, no explanation.
+Return ONLY valid JSON. No markdown, no extra text.
 
 Transcript: "${transcript}"
 
 {
-  "primaryEmotion": "<one of: confident|nervous|monotone|enthusiastic|exciting|happy|sad|angry|calm|fearful|neutral>",
+  "primaryEmotion": "<one of: confident|nervous|monotone|enthusiastic|exciting|happy|sad|angry|calm|fearful|neutral|excited|proud|caring|worried>",
   "secondaryEmotions": ["<emotion>"],
   "overallMood": "<2-3 word phrase>",
-  "moodScore": <number 1-10>,
+  "moodScore": <1-10>,
   "energyLevel": "<low|medium|high>",
-  "confidence": <number 0-100>,
+  "confidence": <0-100>,
   "keyInsight": "<one plain sentence about the overall emotional delivery>"
 }`,
       }],
     }),
   });
   const data = await res.json();
-  const raw = data.content
-    .map((b) => (b.type === "text" ? b.text : ""))
-    .join("").replace(/```json|```/g, "").trim();
+  const raw = data.content.map((b) => (b.type === "text" ? b.text : "")).join("").replace(/```json|```/g, "").trim();
   return JSON.parse(raw);
 }
 
-// ─── API call 2: Sentence-by-sentence emotion breakdown ────────────────────────
-async function detectSentenceEmotions(transcript) {
+// ─── API 2: Phrase-level inline emotion breakdown ──────────────────────────────
+// Breaks each sentence into emotional PHRASES — not just sentences.
+// Example: "I am happy to say I invested [😊 Happy] but cannot invest more [😢 Sad]"
+async function detectPhraseEmotions(transcript) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 4000,
+      max_tokens: 6000,
       messages: [{
         role: "user",
-        content: `You help laymen understand the emotion behind each sentence in a speech script.
+        content: `You are an emotion analysis expert. Your job is to help a layman understand what emotion is being expressed in each part of a speech.
 
-Split this transcript into individual sentences. For each one, return its emotion, a matching emoji, intensity, and a very simple plain English reason why.
+Split the transcript into PHRASES — a phrase is a part of a sentence that carries one clear emotion. A single sentence can have multiple phrases with different emotions.
 
-Return ONLY a valid JSON array. No markdown, no explanation, nothing else.
+EXAMPLE:
+Input: "I am happy to say that I have invested in your company but cannot invest more than this."
+Output:
+[
+  { "phrase": "I am happy to say that I have invested in your company", "emotion": "happy", "emoji": "😊", "label": "Happy" },
+  { "phrase": "but cannot invest more than this", "emotion": "sad", "emoji": "😢", "label": "Sad" }
+]
+
+EXAMPLE 2:
+Input: "Hello bachhon, today we are going to learn something amazing!"
+Output:
+[
+  { "phrase": "Hello bachhon", "emotion": "caring", "emoji": "🤗", "label": "Caring & Warm" },
+  { "phrase": "today we are going to learn something amazing!", "emotion": "excited", "emoji": "🎉", "label": "Excited & Energetic" }
+]
+
+Now do this for the following transcript. Return ONLY a valid JSON array. No markdown, no explanation.
 
 Transcript: "${transcript}"
 
 Format:
 [
   {
-    "sentence": "<exact sentence from transcript>",
-    "emotion": "<one of: confident|nervous|monotone|enthusiastic|exciting|happy|sad|angry|calm|fearful|neutral|surprised|hopeful|sarcastic>",
-    "emoji": "<single emoji matching this emotion>",
-    "intensity": "<low|medium|high>",
-    "reason": "<5-8 plain words a child could understand, e.g. 'sounds scared and unsure of self'>"
+    "phrase": "<exact phrase from transcript>",
+    "emotion": "<one of: confident|nervous|monotone|enthusiastic|exciting|happy|sad|angry|calm|fearful|neutral|surprised|hopeful|sarcastic|worried|excited|proud|caring>",
+    "emoji": "<single emoji that perfectly represents this emotion to a layman>",
+    "label": "<2-4 word plain English label, e.g. 'Happy & Relieved', 'Sad & Worried', 'Excited & Energetic'>"
   }
 ]
 
 Rules:
-- Copy each sentence exactly — do not paraphrase
-- One dominant emotion per sentence
-- reason must be everyday plain English
-- Filler words like "Um", "So", "Well..." → nervous or monotone
-- Never label everything neutral — be specific`,
+- Split at natural emotional boundaries — conjunctions like "but", "however", "yet", "although" often mark a shift in emotion
+- Keep phrases natural — do not break mid-word or mid-thought
+- Every phrase must cover text that actually exists in the transcript
+- The phrases together must reconstruct the full transcript exactly
+- Use everyday plain English for the label
+- Pick emojis a layman would instantly recognise and relate to`,
       }],
     }),
   });
   const data = await res.json();
-  const raw = data.content
-    .map((b) => (b.type === "text" ? b.text : ""))
-    .join("").replace(/```json|```/g, "").trim();
+  const raw = data.content.map((b) => (b.type === "text" ? b.text : "")).join("").replace(/```json|```/g, "").trim();
   return JSON.parse(raw);
 }
 
-// ─── Small reusable UI pieces ──────────────────────────────────────────────────
+// ─── Small UI pieces ───────────────────────────────────────────────────────────
 
 function EmotionTag({ emotion, size = "sm" }) {
   const m = EMOTION_META[emotion] ?? EMOTION_META.neutral;
   return (
     <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full font-medium",
-        size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-sm"
-      )}
+      className={cn("inline-flex items-center gap-1 rounded-full font-medium",
+        size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-sm")}
       style={{ backgroundColor: m.bg, color: m.color, border: `1px solid ${m.color}44` }}
     >
       {m.emoji} {m.label}
@@ -145,10 +161,8 @@ function MoodBar({ score }) {
         <span>Negative</span><span>Neutral</span><span>Positive</span>
       </div>
       <div className="h-1.5 w-full rounded-full" style={{ backgroundColor: "#1f2937" }}>
-        <div
-          className="h-1.5 rounded-full transition-all duration-700"
-          style={{ width: `${pct}%`, backgroundColor: color }}
-        />
+        <div className="h-1.5 rounded-full transition-all duration-700"
+          style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
     </div>
   );
@@ -164,11 +178,9 @@ function ConfidenceArc({ value }) {
     <div className="relative flex items-center justify-center" style={{ width: 64, height: 64 }}>
       <svg width="64" height="64" style={{ transform: "rotate(-90deg)", position: "absolute" }}>
         <circle cx="32" cy="32" r={r} fill="none" stroke="#1f2937" strokeWidth="5" />
-        <circle
-          cx="32" cy="32" r={r} fill="none" stroke={color} strokeWidth="5"
+        <circle cx="32" cy="32" r={r} fill="none" stroke={color} strokeWidth="5"
           strokeDasharray={`${half} ${half}`} strokeDashoffset={offset}
-          strokeLinecap="round" style={{ transition: "stroke-dashoffset 0.8s ease" }}
-        />
+          strokeLinecap="round" style={{ transition: "stroke-dashoffset 0.8s ease" }} />
       </svg>
       <div className="z-10 text-center">
         <div className="text-sm font-bold leading-none" style={{ color }}>{value}%</div>
@@ -188,121 +200,140 @@ function EnergyBadge({ level }) {
   return <span className="text-[10px] font-medium" style={{ color }}>{icon} {label}</span>;
 }
 
-function IntensityDots({ intensity }) {
-  const filled = intensity === "high" ? 3 : intensity === "medium" ? 2 : 1;
-  return (
-    <div className="flex items-center gap-0.5" title={`Intensity: ${intensity}`}>
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="w-1.5 h-1.5 rounded-full"
-          style={{ backgroundColor: i <= filled ? "#a78bfa" : "#1f2937" }} />
-      ))}
-    </div>
-  );
-}
+// ─── Inline phrase display ─────────────────────────────────────────────────────
+// This is the KEY component — shows each phrase with its emoji tag inline
+// exactly like: "Hello bachhon 🤗 Caring & Warm  today we are going to learn something amazing! 🎉 Excited"
 
-// ─── Sentence row — the core "layman" view ─────────────────────────────────────
-function SentenceRow({ item, index }) {
-  const m = EMOTION_META[item.emotion] ?? EMOTION_META.neutral;
-  const [show, setShow] = useState(false);
-
+function InlinePhraseView({ phrases }) {
+  const [visible, setVisible] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setShow(true), index * 55);
+    const t = setTimeout(() => setVisible(true), 100);
     return () => clearTimeout(t);
-  }, [index]);
+  }, []);
 
-  if (!show) return null;
-
-  return (
-    <div
-      className="rounded-xl p-3"
-      style={{
-        backgroundColor: `${m.bg}bb`,
-        border: `1px solid ${m.color}44`,
-        animation: "rowIn 0.3s ease forwards",
-        opacity: 0,
-        animationDelay: `${index * 55}ms`,
-      }}
-    >
-      <div className="flex items-start gap-3">
-
-        {/* LEFT — big emoji + number */}
-        <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5" style={{ width: "2.5rem" }}>
-          <span className="text-3xl leading-none">{item.emoji}</span>
-          <span className="text-[9px] font-mono" style={{ color: "#475569" }}>#{index + 1}</span>
-        </div>
-
-        {/* RIGHT — sentence text + tags */}
-        <div className="flex-1 min-w-0">
-
-          {/* The actual sentence in large readable text */}
-          <p className="text-sm font-medium leading-relaxed mb-2" style={{ color: "#f1f5f9" }}>
-            {item.sentence}
-          </p>
-
-          {/* Emotion tag + intensity + plain reason */}
-          <div className="flex items-center flex-wrap gap-2">
-            <EmotionTag emotion={item.emotion} />
-            <IntensityDots intensity={item.intensity} />
-            <span className="text-[11px] italic" style={{ color: "#94a3b8" }}>
-              — {item.reason}
-            </span>
-          </div>
-
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Script breakdown panel ────────────────────────────────────────────────────
-function ScriptBreakdown({ sentences }) {
-  // Count how often each emotion appears
-  const freq = sentences.reduce((acc, s) => {
-    acc[s.emotion] = (acc[s.emotion] || 0) + 1;
-    return acc;
-  }, {});
-  const topEmotions = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+  if (!visible) return null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
+      <style>{`
+        @keyframes phraseIn {
+          from { opacity: 0; transform: translateY(4px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
 
-      {/* ── Title + emotion frequency summary ── */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h4 className="text-sm font-bold" style={{ color: "#f1f5f9" }}>
-            📜 Script Breakdown
-          </h4>
-          <p className="text-[11px] mt-0.5" style={{ color: "#64748b" }}>
-            {sentences.length} sentences analysed · each colour-coded by emotion
-          </p>
-        </div>
-        {/* Top emotions found in this script */}
-        <div className="flex flex-wrap gap-1.5">
-          {topEmotions.slice(0, 4).map(([emotion, count]) => {
-            const m = EMOTION_META[emotion] ?? EMOTION_META.neutral;
+      {/* ── Inline reading view — the layman view ── */}
+      <div
+        className="rounded-xl p-4 leading-relaxed"
+        style={{ backgroundColor: "#0a0f1e", border: "1px solid #1e293b" }}
+      >
+        <p className="text-[10px] uppercase tracking-wider mb-3" style={{ color: "#475569" }}>
+          📖 Read along — emotion shown after each phrase
+        </p>
+
+        {/* All phrases flow inline like normal reading */}
+        <p className="text-sm leading-loose" style={{ color: "#e2e8f0" }}>
+          {phrases.map((p, i) => {
+            const m = EMOTION_META[p.emotion] ?? EMOTION_META.neutral;
             return (
-              <span key={emotion}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                style={{ backgroundColor: m.bg, color: m.color, border: `1px solid ${m.color}44` }}
-              >
-                {m.emoji} {m.label} ×{count}
+              <span key={i} style={{
+                animation: `phraseIn 0.3s ease forwards`,
+                animationDelay: `${i * 120}ms`,
+                opacity: 0,
+                display: "inline",
+              }}>
+                {/* The phrase text — highlighted with a subtle background */}
+                <span
+                  className="rounded px-1 py-0.5 mx-0.5"
+                  style={{
+                    backgroundColor: `${m.bg}cc`,
+                    color: "#f1f5f9",
+                    borderBottom: `2px solid ${m.color}`,
+                  }}
+                >
+                  {p.phrase}
+                </span>
+
+                {/* Inline emotion badge right after the phrase */}
+                <span
+                  className="inline-flex items-center gap-0.5 mx-1 px-2 py-0.5 rounded-full text-[10px] font-semibold align-middle"
+                  style={{
+                    backgroundColor: m.bg,
+                    color: m.color,
+                    border: `1px solid ${m.color}55`,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {p.emoji} {p.label}
+                </span>
               </span>
+            );
+          })}
+        </p>
+      </div>
+
+      {/* ── Phrase-by-phrase stacked view (cleaner for long transcripts) ── */}
+      <div
+        className="rounded-xl p-4"
+        style={{ backgroundColor: "#060a14", border: "1px solid #1e293b" }}
+      >
+        <p className="text-[10px] uppercase tracking-wider mb-3" style={{ color: "#475569" }}>
+          🔍 Phrase-by-phrase detail
+        </p>
+
+        <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1"
+          style={{ scrollbarWidth: "thin", scrollbarColor: "#334155 transparent" }}>
+          {phrases.map((p, i) => {
+            const m = EMOTION_META[p.emotion] ?? EMOTION_META.neutral;
+            return (
+              <div
+                key={i}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5"
+                style={{
+                  backgroundColor: `${m.bg}99`,
+                  border: `1px solid ${m.color}33`,
+                  animation: `phraseIn 0.3s ease forwards`,
+                  animationDelay: `${i * 100}ms`,
+                  opacity: 0,
+                }}
+              >
+                {/* Big emoji */}
+                <span className="text-2xl shrink-0">{p.emoji}</span>
+
+                {/* Phrase text */}
+                <p className="flex-1 text-sm font-medium" style={{ color: "#f1f5f9" }}>
+                  {p.phrase}
+                </p>
+
+                {/* Emotion label pill */}
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold shrink-0"
+                  style={{
+                    backgroundColor: m.bg,
+                    color: m.color,
+                    border: `1px solid ${m.color}55`,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {p.label}
+                </span>
+              </div>
             );
           })}
         </div>
       </div>
 
-      {/* ── Emotional flow bar ── */}
+      {/* ── Emotion flow bar ── */}
       <div>
         <p className="text-[10px] uppercase tracking-wider mb-1.5" style={{ color: "#475569" }}>
-          Emotional flow — left = start, right = end
+          Emotional flow across script
         </p>
-        <div className="flex h-5 rounded-full overflow-hidden gap-px">
-          {sentences.map((s, i) => {
-            const m = EMOTION_META[s.emotion] ?? EMOTION_META.neutral;
+        <div className="flex h-4 rounded-full overflow-hidden gap-px">
+          {phrases.map((p, i) => {
+            const m = EMOTION_META[p.emotion] ?? EMOTION_META.neutral;
             return (
               <div key={i} className="flex-1" style={{ backgroundColor: m.color }}
-                title={`#${i + 1} ${s.emotion}: ${s.sentence.slice(0, 50)}…`}
+                title={`${p.emoji} ${p.label}: "${p.phrase.slice(0, 40)}…"`}
               />
             );
           })}
@@ -316,7 +347,7 @@ function ScriptBreakdown({ sentences }) {
       <div className="rounded-lg p-3"
         style={{ backgroundColor: "#0a0f1e", border: "1px solid #1e293b" }}>
         <p className="text-[9px] uppercase tracking-wider mb-2" style={{ color: "#475569" }}>
-          Emoji guide — what each one means
+          Emoji guide
         </p>
         <div className="flex flex-wrap gap-1.5">
           {Object.entries(EMOTION_META).map(([key, m]) => (
@@ -329,29 +360,13 @@ function ScriptBreakdown({ sentences }) {
         </div>
       </div>
 
-      {/* ── Sentence rows ── */}
-      <style>{`
-        @keyframes rowIn {
-          from { opacity: 0; transform: translateY(5px); }
-          to   { opacity: 1; transform: translateY(0);   }
-        }
-        .sent-scroll::-webkit-scrollbar { width: 3px; }
-        .sent-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
-      `}</style>
-
-      <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1 sent-scroll">
-        {sentences.map((item, i) => (
-          <SentenceRow key={i} item={item} index={i} />
-        ))}
-      </div>
-
     </div>
   );
 }
 
-// ─── Individual session card ───────────────────────────────────────────────────
+// ─── Session card ──────────────────────────────────────────────────────────────
 function SessionEmotionCard({
-  session, result, sentences,
+  session, result, phrases,
   loading, breakdownLoading,
   onAnalyse, onBreakdown,
 }) {
@@ -368,15 +383,14 @@ function SessionEmotionCard({
     return () => clearTimeout(timerRef.current);
   }, []);
 
-  // Auto-open breakdown when sentences arrive
   useEffect(() => {
-    if (sentences && sentences.length > 0) setShowBreakdown(true);
-  }, [sentences]);
+    if (phrases && phrases.length > 0) setShowBreakdown(true);
+  }, [phrases]);
 
   if (!visible) return null;
 
   const primary     = result?.primaryEmotion;
-  const accentColor = primary ? EMOTION_META[primary]?.color : undefined;
+  const accentColor = primary ? (EMOTION_META[primary]?.color ?? undefined) : undefined;
 
   return (
     <LiquidCard
@@ -385,7 +399,7 @@ function SessionEmotionCard({
     >
       <CardContent className="p-6 space-y-4">
 
-        {/* ── Card header ── */}
+        {/* Header */}
         <CardHeader className="flex flex-row items-start justify-between gap-4 p-0">
           <div className="flex-1 min-w-0">
             <div className="flex items-center flex-wrap gap-2 mb-1">
@@ -407,24 +421,21 @@ function SessionEmotionCard({
             className="shrink-0 text-xs font-semibold h-8 px-4 rounded-full"
           >
             {loading
-              ? <span className="flex items-center gap-1.5">
-                  <span className="animate-spin">⟳</span> Analysing…
-                </span>
+              ? <span className="flex items-center gap-1.5"><span className="animate-spin">⟳</span> Analysing…</span>
               : result ? "↺ Re-analyse" : "✦ Detect Mood"}
           </LiquidButton>
         </CardHeader>
 
-        {/* ── Transcript preview ── */}
+        {/* Transcript preview */}
         <p className="text-xs leading-relaxed line-clamp-2" style={{ color: "#64748b" }}>
           "{session.transcript.slice(0, 200)}{session.transcript.length > 200 ? "…" : ""}"
         </p>
 
-        {/* ── Overall result block ── */}
+        {/* Overall result */}
         {result && (
           <div className="rounded-xl p-4 space-y-3"
             style={{ backgroundColor: "#0a0f1e", border: "1px solid #1e293b" }}>
 
-            {/* Confidence arc + mood info */}
             <div className="flex items-start gap-4">
               <ConfidenceArc value={result.confidence} />
               <div className="flex-1 min-w-0 space-y-2">
@@ -441,22 +452,17 @@ function SessionEmotionCard({
               </div>
             </div>
 
-            {/* Secondary emotions */}
             {result.secondaryEmotions?.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="text-[10px] mr-1" style={{ color: "#475569" }}>
-                  Also detected:
-                </span>
-                {result.secondaryEmotions.map((e) => (
-                  <EmotionTag key={e} emotion={e} />
-                ))}
+                <span className="text-[10px] mr-1" style={{ color: "#475569" }}>Also detected:</span>
+                {result.secondaryEmotions.map((e) => <EmotionTag key={e} emotion={e} />)}
               </div>
             )}
 
-            {/* ── Sentence breakdown button ── */}
+            {/* Breakdown button */}
             <button
               onClick={() => {
-                if (sentences && sentences.length > 0) {
+                if (phrases && phrases.length > 0) {
                   setShowBreakdown((v) => !v);
                 } else {
                   onBreakdown();
@@ -465,32 +471,25 @@ function SessionEmotionCard({
               disabled={breakdownLoading}
               className="w-full h-10 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all duration-200"
               style={{
-                background: breakdownLoading
-                  ? "#1e293b"
-                  : "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                background: breakdownLoading ? "#1e293b" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
                 color: breakdownLoading ? "#475569" : "#fff",
                 border: "none",
                 cursor: breakdownLoading ? "not-allowed" : "pointer",
                 opacity: breakdownLoading ? 0.7 : 1,
               }}
             >
-              {breakdownLoading ? (
-                <><span className="animate-spin">⟳</span> Analysing each sentence…</>
-              ) : showBreakdown && sentences?.length > 0 ? (
-                "🙈 Hide sentence breakdown"
-              ) : (
-                "📜 Show sentence-by-sentence breakdown"
-              )}
+              {breakdownLoading
+                ? <><span className="animate-spin">⟳</span> Analysing phrases…</>
+                : showBreakdown && phrases?.length > 0
+                  ? "🙈 Hide emotion breakdown"
+                  : "📖 Show inline emotion breakdown"}
             </button>
           </div>
         )}
 
-        {/* ── Sentence breakdown panel ── */}
-        {showBreakdown && sentences && sentences.length > 0 && (
-          <div className="rounded-xl p-4"
-            style={{ backgroundColor: "#060a14", border: "1px solid #1e293b" }}>
-            <ScriptBreakdown sentences={sentences} />
-          </div>
+        {/* Inline phrase breakdown */}
+        {showBreakdown && phrases && phrases.length > 0 && (
+          <InlinePhraseView phrases={phrases} />
         )}
 
       </CardContent>
@@ -501,7 +500,7 @@ function SessionEmotionCard({
 // ─── Main export ───────────────────────────────────────────────────────────────
 export function EmotionDetectionPanel({ sessions, className }) {
   const [results,          setResults]          = useState({});
-  const [sentences,        setSentences]        = useState({});
+  const [phrases,          setPhrases]          = useState({});
   const [loading,          setLoading]          = useState(null);
   const [breakdownLoading, setBreakdownLoading] = useState(null);
   const [error,            setError]            = useState(null);
@@ -531,10 +530,10 @@ export function EmotionDetectionPanel({ sessions, className }) {
     setBreakdownLoading(session.id);
     setError(null);
     try {
-      const result = await detectSentenceEmotions(session.transcript);
-      setSentences((prev) => ({ ...prev, [session.id]: result }));
+      const result = await detectPhraseEmotions(session.transcript);
+      setPhrases((prev) => ({ ...prev, [session.id]: result }));
     } catch {
-      setError("Sentence breakdown failed — try again.");
+      setError("Phrase breakdown failed — try again.");
     } finally {
       setBreakdownLoading(null);
     }
@@ -543,7 +542,7 @@ export function EmotionDetectionPanel({ sessions, className }) {
   return (
     <section className={cn("space-y-6", className)}>
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
           style={{ background: "linear-gradient(135deg,#7c3aed,#4f46e5)", boxShadow: "0 0 20px #7c3aed33" }}>
@@ -552,12 +551,12 @@ export function EmotionDetectionPanel({ sessions, className }) {
         <div>
           <h2 className="text-lg font-semibold" style={{ color: "#f1f5f9" }}>Emotion Detection</h2>
           <p className="text-xs" style={{ color: "#64748b" }}>
-            AI-powered emotional tone · sentence by sentence
+            AI-powered · inline emotion shown on every phrase
           </p>
         </div>
       </div>
 
-      {/* ── Stats ── */}
+      {/* Stats */}
       <div className="grid grid-cols-3 rounded-xl overflow-hidden text-center"
         style={{ border: "1px solid #1e293b", backgroundColor: "#0a0f1e" }}>
         {[
@@ -568,18 +567,14 @@ export function EmotionDetectionPanel({ sessions, className }) {
           <div key={label} className="py-3 px-2"
             style={{ borderRight: i < 2 ? "1px solid #1e293b" : "none" }}>
             <div className="text-xl font-bold" style={{ color }}>{value}</div>
-            <div className="text-[10px] uppercase tracking-wide" style={{ color: "#475569" }}>
-              {label}
-            </div>
+            <div className="text-[10px] uppercase tracking-wide" style={{ color: "#475569" }}>{label}</div>
           </div>
         ))}
       </div>
 
-      {/* ── Detectable emotions legend ── */}
-      <div className="rounded-xl p-4"
-        style={{ border: "1px solid #1e293b", backgroundColor: "#0a0f1e" }}>
-        <p className="text-[10px] font-semibold uppercase tracking-wider mb-2.5"
-          style={{ color: "#475569" }}>
+      {/* Emotion legend */}
+      <div className="rounded-xl p-4" style={{ border: "1px solid #1e293b", backgroundColor: "#0a0f1e" }}>
+        <p className="text-[10px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: "#475569" }}>
           Detectable emotions
         </p>
         <div className="flex flex-wrap gap-1.5">
@@ -587,7 +582,7 @@ export function EmotionDetectionPanel({ sessions, className }) {
         </div>
       </div>
 
-      {/* ── Error ── */}
+      {/* Error */}
       {error && (
         <div className="rounded-xl px-4 py-3 text-sm flex items-center gap-2"
           style={{ backgroundColor: "#450a0a", border: "1px solid #ef444433", color: "#fca5a5" }}>
@@ -595,7 +590,7 @@ export function EmotionDetectionPanel({ sessions, className }) {
         </div>
       )}
 
-      {/* ── Session cards ── */}
+      {/* Session cards */}
       <CounterProvider>
         <div className="space-y-3">
           {sessions.map((session) => (
@@ -603,7 +598,7 @@ export function EmotionDetectionPanel({ sessions, className }) {
               key={session.id}
               session={session}
               result={results[session.id]}
-              sentences={sentences[session.id]}
+              phrases={phrases[session.id]}
               loading={loading === session.id}
               breakdownLoading={breakdownLoading === session.id}
               onAnalyse={() => handleAnalyse(session)}
@@ -613,28 +608,21 @@ export function EmotionDetectionPanel({ sessions, className }) {
         </div>
       </CounterProvider>
 
-      {/* ── Overall mood summary (shown after at least 1 analysis) ── */}
+      {/* Overall mood summary */}
       {analysedCount > 0 && (
         <LiquidCard className="animate-in fade-in slide-in-from-bottom-4 duration-700">
           <CardContent className="p-5 space-y-3">
-
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <h3 className="text-sm font-semibold" style={{ color: "#f1f5f9" }}>
-                Overall script mood
-              </h3>
+              <h3 className="text-sm font-semibold" style={{ color: "#f1f5f9" }}>Overall script mood</h3>
               {avgConf !== null && (
-                <Badge variant="secondary" className="text-[10px]">
-                  Avg confidence: {avgConf}%
-                </Badge>
+                <Badge variant="secondary" className="text-[10px]">Avg confidence: {avgConf}%</Badge>
               )}
             </div>
-
             <div className="flex flex-wrap gap-1.5">
               {[...new Set(Object.values(results).map((r) => r.primaryEmotion))].map((e) => (
                 <EmotionTag key={e} emotion={e} size="md" />
               ))}
             </div>
-
             <div className="space-y-2 pt-1">
               {Object.entries(results).map(([id, r]) => {
                 const sess = sessions.find((s) => String(s.id) === String(id));
@@ -653,7 +641,6 @@ export function EmotionDetectionPanel({ sessions, className }) {
                 );
               })}
             </div>
-
           </CardContent>
         </LiquidCard>
       )}
