@@ -8,6 +8,9 @@ import { LiquidCard, CardContent, CardHeader } from "./liquid-glass-card";
 import { Badge } from "./badge";
 import { cn } from "../../lib/utils";
 
+// ─── API Key ───────────────────────────────────────────────────────────────────
+const ANTHROPIC_API_KEY = process.env.REACT_APP_groq_api_karthavya || "";
+
 // ─── Emotion metadata ──────────────────────────────────────────────────────────
 const EMOTION_META = {
   confident:    { emoji: "💪", color: "#3b82f6", bg: "#1e3a5f", label: "Confident"     },
@@ -43,17 +46,35 @@ function useCounter() {
   return ctx.getNextIndex;
 }
 
-// ─── API 1: Overall emotion ────────────────────────────────────────────────────
-async function detectEmotion(transcript) {
+// ─── API helper ────────────────────────────────────────────────────────────────
+async function callClaude(prompt, maxTokens = 1000) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      messages: [{
-        role: "user",
-        content: `Analyse the emotional tone of this speech transcript.
+      max_tokens: maxTokens,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.content.map((b) => (b.type === "text" ? b.text : "")).join("").replace(/```json|```/g, "").trim();
+}
+
+// ─── API 1: Overall emotion ────────────────────────────────────────────────────
+async function detectEmotion(transcript) {
+  const raw = await callClaude(`Analyse the emotional tone of this speech transcript.
 Return ONLY valid JSON. No markdown, no extra text.
 
 Transcript: "${transcript}"
@@ -66,28 +87,15 @@ Transcript: "${transcript}"
   "energyLevel": "<low|medium|high>",
   "confidence": <0-100>,
   "keyInsight": "<one plain sentence about the overall emotional delivery>"
-}`,
-      }],
-    }),
-  });
-  const data = await res.json();
-  const raw = data.content.map((b) => (b.type === "text" ? b.text : "")).join("").replace(/```json|```/g, "").trim();
+}`, 1000);
   return JSON.parse(raw);
 }
 
-// ─── API 2: Phrase breakdown ───────────────────────────────────────────────────
+// ─── API 2: Phrase-level breakdown ────────────────────────────────────────────
 async function detectPhraseEmotions(transcript) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 6000,
-      messages: [{
-        role: "user",
-        content: `You are an emotion analysis expert. Help a layman understand what emotion each part of a speech expresses.
+  const raw = await callClaude(`You are an emotion analysis expert. Help a layman understand what emotion each part of a speech expresses.
 
-Split the transcript into PHRASES. Each phrase is a part that carries one clear emotion. One sentence can have multiple phrases with different emotions.
+Split the transcript into PHRASES. Each phrase carries one clear emotion. One sentence can have multiple phrases with different emotions.
 
 EXAMPLE 1:
 Input: "I am happy to say that I have invested in your company but cannot invest more than this."
@@ -116,12 +124,12 @@ Transcript: "${transcript}"
     "emoji": "<single emoji>",
     "label": "<2-4 plain English words>"
   }
-]`,
-      }],
-    }),
-  });
-  const data = await res.json();
-  const raw = data.content.map((b) => (b.type === "text" ? b.text : "")).join("").replace(/```json|```/g, "").trim();
+]
+
+Rules:
+- Split at emotional turning points — 'but', 'however', 'yet', 'although', 'unfortunately' signal a shift
+- Every phrase must be exact text from the transcript
+- Labels must be simple words anyone can understand`, 6000);
   return JSON.parse(raw);
 }
 
@@ -206,8 +214,10 @@ function PhraseItem({ p, index, mode }) {
           style={{ backgroundColor: `${m.bg}cc`, color: "#f1f5f9", borderBottom: `2px solid ${m.color}` }}>
           {p.phrase}
         </span>
-        <span className="inline-flex items-center gap-1 mx-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold align-middle"
-          style={{ backgroundColor: m.bg, color: m.color, border: `1px solid ${m.color}66`, whiteSpace: "nowrap" }}>
+        <span
+          className="inline-flex items-center gap-1 mx-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold align-middle"
+          style={{ backgroundColor: m.bg, color: m.color, border: `1px solid ${m.color}66`, whiteSpace: "nowrap" }}
+        >
           {p.emoji} {p.label}
         </span>
       </span>
@@ -218,9 +228,7 @@ function PhraseItem({ p, index, mode }) {
     <div className="flex items-center gap-3 rounded-xl px-4 py-3"
       style={{ backgroundColor: `${m.bg}cc`, border: `1px solid ${m.color}44` }}>
       <span className="text-3xl shrink-0">{p.emoji}</span>
-      <p className="flex-1 text-sm font-medium leading-relaxed" style={{ color: "#f1f5f9" }}>
-        {p.phrase}
-      </p>
+      <p className="flex-1 text-sm font-medium leading-relaxed" style={{ color: "#f1f5f9" }}>{p.phrase}</p>
       <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold shrink-0"
         style={{ backgroundColor: m.bg, color: m.color, border: `1px solid ${m.color}66`, whiteSpace: "nowrap" }}>
         {p.emoji} {p.label}
@@ -304,11 +312,9 @@ function InlinePhraseView({ phrases }) {
         </div>
       </div>
 
-      {/* Legend */}
+      {/* Emoji legend */}
       <div className="rounded-lg p-3" style={{ backgroundColor: "#0a0f1e", border: "1px solid #1e293b" }}>
-        <p className="text-[9px] uppercase tracking-wider mb-2" style={{ color: "#475569" }}>
-          Emoji guide
-        </p>
+        <p className="text-[9px] uppercase tracking-wider mb-2" style={{ color: "#475569" }}>Emoji guide</p>
         <div className="flex flex-wrap gap-1.5">
           {Object.entries(EMOTION_META).map(([key, m]) => (
             <span key={key} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium"
@@ -323,22 +329,21 @@ function InlinePhraseView({ phrases }) {
   );
 }
 
-// ─── Loading skeleton ──────────────────────────────────────────────────────────
+// ─── Spinner ───────────────────────────────────────────────────────────────────
 function AnalysingSpinner({ message }) {
   return (
     <div className="flex items-center gap-3 py-2">
-      <div className="w-5 h-5 rounded-full border-2 border-violet-500 border-t-transparent animate-spin shrink-0" />
+      <div className="w-4 h-4 rounded-full border-2 border-violet-500 border-t-transparent animate-spin shrink-0" />
       <span className="text-xs" style={{ color: "#94a3b8" }}>{message}</span>
     </div>
   );
 }
 
-// ─── Session card — auto-analyses, no button ───────────────────────────────────
-function SessionEmotionCard({ session, result, phrases, analysing, breakdownRunning }) {
+// ─── Session card ──────────────────────────────────────────────────────────────
+function SessionEmotionCard({ session, result, phrases, analysing, breakdownRunning, error }) {
   const getNextIndex = useCounter();
   const indexRef = useRef(null);
   const [visible, setVisible] = useState(false);
-  const [tab, setTab] = useState("inline");
 
   if (indexRef.current === null) indexRef.current = getNextIndex();
 
@@ -359,7 +364,7 @@ function SessionEmotionCard({ session, result, phrases, analysing, breakdownRunn
     >
       <CardContent className="p-6 space-y-4">
 
-        {/* Header — no button */}
+        {/* Header */}
         <CardHeader className="flex flex-row items-start justify-between gap-4 p-0">
           <div className="flex-1 min-w-0">
             <div className="flex items-center flex-wrap gap-2 mb-1">
@@ -388,21 +393,25 @@ function SessionEmotionCard({ session, result, phrases, analysing, breakdownRunn
           "{session.transcript.slice(0, 200)}{session.transcript.length > 200 ? "…" : ""}"
         </p>
 
-        {/* Analysing spinner */}
-        {analysing && <AnalysingSpinner message="Detecting overall emotion…" />}
+        {/* Per-card error */}
+        {error && (
+          <div className="rounded-lg px-3 py-2 text-xs flex items-center gap-2"
+            style={{ backgroundColor: "#450a0a", border: "1px solid #ef444433", color: "#fca5a5" }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        {analysing && <AnalysingSpinner message="Detecting emotional tone…" />}
 
         {/* Overall result */}
         {result && (
           <div className="rounded-xl p-4 space-y-3"
             style={{ backgroundColor: "#0a0f1e", border: "1px solid #1e293b" }}>
-
             <div className="flex items-start gap-4">
               <ConfidenceArc value={result.confidence} />
               <div className="flex-1 min-w-0 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-bold" style={{ color: "#f1f5f9" }}>
-                    {result.overallMood}
-                  </span>
+                  <span className="text-sm font-bold" style={{ color: "#f1f5f9" }}>{result.overallMood}</span>
                   <Badge variant="secondary" className="text-[10px] px-2 py-0.5">
                     Score {result.moodScore}/10
                   </Badge>
@@ -411,7 +420,6 @@ function SessionEmotionCard({ session, result, phrases, analysing, breakdownRunn
                 <MoodBar score={result.moodScore} />
               </div>
             </div>
-
             {result.secondaryEmotions?.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 pt-1">
                 <span className="text-[10px] mr-1" style={{ color: "#475569" }}>Also detected:</span>
@@ -421,13 +429,8 @@ function SessionEmotionCard({ session, result, phrases, analysing, breakdownRunn
           </div>
         )}
 
-        {/* Phrase breakdown loading */}
         {breakdownRunning && <AnalysingSpinner message="Breaking down phrase by phrase…" />}
-
-        {/* Phrase breakdown */}
-        {phrases && phrases.length > 0 && (
-          <InlinePhraseView phrases={phrases} />
-        )}
+        {phrases && phrases.length > 0 && <InlinePhraseView phrases={phrases} />}
 
       </CardContent>
     </LiquidCard>
@@ -436,12 +439,12 @@ function SessionEmotionCard({ session, result, phrases, analysing, breakdownRunn
 
 // ─── Main export ───────────────────────────────────────────────────────────────
 export function EmotionDetectionPanel({ sessions, className }) {
-  const [results,  setResults]  = useState({});
-  const [phrases,  setPhrases]  = useState({});
-  const [analysing, setAnalysing] = useState({});   // per session
-  const [breaking,  setBreaking]  = useState({});   // per session
-  const [error,    setError]    = useState(null);
-  const analysedRef = useRef(new Set());            // track which sessions already ran
+  const [results,   setResults]   = useState({});
+  const [phrases,   setPhrases]   = useState({});
+  const [analysing, setAnalysing] = useState({});
+  const [breaking,  setBreaking]  = useState({});
+  const [errors,    setErrors]    = useState({});
+  const analysedRef = useRef(new Set());
 
   const analysedCount = Object.keys(results).length;
   const avgMood = analysedCount > 0
@@ -451,37 +454,36 @@ export function EmotionDetectionPanel({ sessions, className }) {
     ? Math.round(Object.values(results).reduce((s, r) => s + r.confidence, 0) / analysedCount)
     : null;
 
-  // ── Auto-run both API calls whenever a new session appears ──
+  // Auto-run analysis when sessions appear
   useEffect(() => {
     sessions.forEach((session) => {
-      if (analysedRef.current.has(session.id)) return; // already ran
-      if (!session.transcript?.trim()) return;          // skip empty
+      if (analysedRef.current.has(session.id)) return;
+      if (!session.transcript?.trim()) return;
       analysedRef.current.add(session.id);
       runAnalysis(session);
     });
   }, [sessions]);
 
   async function runAnalysis(session) {
-    // Step 1: overall emotion
     setAnalysing((prev) => ({ ...prev, [session.id]: true }));
-    setError(null);
+    setErrors((prev) => ({ ...prev, [session.id]: null }));
+
     try {
       const result = await detectEmotion(session.transcript);
       setResults((prev) => ({ ...prev, [session.id]: result }));
-    } catch {
-      setError(`Could not analyse "${session.title}" — API error.`);
+    } catch (e) {
+      setErrors((prev) => ({ ...prev, [session.id]: `API error: ${e.message}` }));
       setAnalysing((prev) => ({ ...prev, [session.id]: false }));
       return;
     }
     setAnalysing((prev) => ({ ...prev, [session.id]: false }));
 
-    // Step 2: phrase breakdown (runs right after)
     setBreaking((prev) => ({ ...prev, [session.id]: true }));
     try {
       const result = await detectPhraseEmotions(session.transcript);
       setPhrases((prev) => ({ ...prev, [session.id]: result }));
     } catch {
-      // phrase breakdown failing silently is okay — overall result already shown
+      // phrase breakdown fails silently
     }
     setBreaking((prev) => ({ ...prev, [session.id]: false }));
   }
@@ -529,14 +531,6 @@ export function EmotionDetectionPanel({ sessions, className }) {
         </div>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="rounded-xl px-4 py-3 text-sm flex items-center gap-2"
-          style={{ backgroundColor: "#450a0a", border: "1px solid #ef444433", color: "#fca5a5" }}>
-          ⚠️ {error}
-        </div>
-      )}
-
       {/* Session cards */}
       <CounterProvider>
         <div className="space-y-3">
@@ -548,6 +542,7 @@ export function EmotionDetectionPanel({ sessions, className }) {
               phrases={phrases[session.id]}
               analysing={!!analysing[session.id]}
               breakdownRunning={!!breaking[session.id]}
+              error={errors[session.id]}
             />
           ))}
         </div>
