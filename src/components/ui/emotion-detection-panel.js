@@ -8,8 +8,8 @@ import { LiquidCard, CardContent, CardHeader } from "./liquid-glass-card";
 import { Badge } from "./badge";
 import { cn } from "../../lib/utils";
 
-// ─── API Key ───────────────────────────────────────────────────────────────────
-const ANTHROPIC_API_KEY = process.env.REACT_APP_groq_api_karthavya || "";
+// ─── Groq API Key ──────────────────────────────────────────────────────────────
+const GROQ_API_KEY = process.env.REACT_APP_groq_api_karthavya || "";
 
 // ─── Emotion metadata ──────────────────────────────────────────────────────────
 const EMOTION_META = {
@@ -46,19 +46,18 @@ function useCounter() {
   return ctx.getNextIndex;
 }
 
-// ─── API helper ────────────────────────────────────────────────────────────────
-async function callClaude(prompt, maxTokens = 1000) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+// ─── Groq API helper ───────────────────────────────────────────────────────────
+async function callGroq(prompt, maxTokens = 1024) {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
+      "Authorization": `Bearer ${GROQ_API_KEY}`,
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "llama-3.3-70b-versatile",
       max_tokens: maxTokens,
+      temperature: 0.3,
       messages: [{ role: "user", content: prompt }],
     }),
   });
@@ -69,31 +68,32 @@ async function callClaude(prompt, maxTokens = 1000) {
   }
 
   const data = await res.json();
-  return data.content.map((b) => (b.type === "text" ? b.text : "")).join("").replace(/```json|```/g, "").trim();
+  return data.choices[0].message.content.replace(/```json|```/g, "").trim();
 }
 
 // ─── API 1: Overall emotion ────────────────────────────────────────────────────
 async function detectEmotion(transcript) {
-  const raw = await callClaude(`Analyse the emotional tone of this speech transcript.
-Return ONLY valid JSON. No markdown, no extra text.
+  const raw = await callGroq(`Analyse the emotional tone of this speech transcript.
+Return ONLY valid JSON. No markdown, no extra text, no explanation.
 
 Transcript: "${transcript}"
 
+Return exactly this JSON:
 {
   "primaryEmotion": "<one of: confident|nervous|monotone|enthusiastic|exciting|happy|sad|angry|calm|fearful|neutral|excited|proud|caring|worried>",
   "secondaryEmotions": ["<emotion>"],
   "overallMood": "<2-3 word phrase>",
-  "moodScore": <1-10>,
+  "moodScore": <number 1-10>,
   "energyLevel": "<low|medium|high>",
-  "confidence": <0-100>,
+  "confidence": <number 0-100>,
   "keyInsight": "<one plain sentence about the overall emotional delivery>"
-}`, 1000);
+}`, 1024);
   return JSON.parse(raw);
 }
 
 // ─── API 2: Phrase-level breakdown ────────────────────────────────────────────
 async function detectPhraseEmotions(transcript) {
-  const raw = await callClaude(`You are an emotion analysis expert. Help a layman understand what emotion each part of a speech expresses.
+  const raw = await callGroq(`You are an emotion analysis expert. Help a layman understand what emotion each part of a speech expresses.
 
 Split the transcript into PHRASES. Each phrase carries one clear emotion. One sentence can have multiple phrases with different emotions.
 
@@ -113,7 +113,7 @@ Output:
   { "phrase": "today we are going to learn something amazing!", "emotion": "excited", "emoji": "🎉", "label": "Excited & Energetic" }
 ]
 
-Now analyse this transcript. Return ONLY a valid JSON array. No markdown, no explanation.
+Now analyse this transcript. Return ONLY a valid JSON array. No markdown, no explanation, nothing else.
 
 Transcript: "${transcript}"
 
@@ -127,9 +127,9 @@ Transcript: "${transcript}"
 ]
 
 Rules:
-- Split at emotional turning points — 'but', 'however', 'yet', 'although', 'unfortunately' signal a shift
+- Split at emotional turning points — but, however, yet, although, unfortunately signal a shift
 - Every phrase must be exact text from the transcript
-- Labels must be simple words anyone can understand`, 6000);
+- Labels must be simple words anyone can understand`, 4096);
   return JSON.parse(raw);
 }
 
@@ -246,7 +246,6 @@ function InlinePhraseView({ phrases }) {
   return (
     <div className="space-y-4">
 
-      {/* Top emotions */}
       <div className="flex flex-wrap gap-1.5">
         {topEmotions.slice(0, 5).map(([emotion, count]) => {
           const m = EMOTION_META[emotion] ?? EMOTION_META.neutral;
@@ -260,7 +259,6 @@ function InlinePhraseView({ phrases }) {
         })}
       </div>
 
-      {/* Tab switcher */}
       <div className="flex gap-2">
         {[{ id: "inline", label: "📖 Inline view" }, { id: "stacked", label: "🔍 Phrase detail" }].map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
@@ -275,7 +273,6 @@ function InlinePhraseView({ phrases }) {
         ))}
       </div>
 
-      {/* Inline view */}
       {tab === "inline" && (
         <div className="rounded-xl p-4" style={{ backgroundColor: "#0a0f1e", border: "1px solid #1e293b" }}>
           <p className="text-[10px] uppercase tracking-wider mb-3" style={{ color: "#475569" }}>
@@ -287,7 +284,6 @@ function InlinePhraseView({ phrases }) {
         </div>
       )}
 
-      {/* Stacked view */}
       {tab === "stacked" && (
         <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1"
           style={{ scrollbarWidth: "thin", scrollbarColor: "#334155 transparent" }}>
@@ -295,7 +291,6 @@ function InlinePhraseView({ phrases }) {
         </div>
       )}
 
-      {/* Flow bar */}
       <div>
         <p className="text-[10px] uppercase tracking-wider mb-1.5" style={{ color: "#475569" }}>
           Emotional flow — left to right
@@ -312,7 +307,6 @@ function InlinePhraseView({ phrases }) {
         </div>
       </div>
 
-      {/* Emoji legend */}
       <div className="rounded-lg p-3" style={{ backgroundColor: "#0a0f1e", border: "1px solid #1e293b" }}>
         <p className="text-[9px] uppercase tracking-wider mb-2" style={{ color: "#475569" }}>Emoji guide</p>
         <div className="flex flex-wrap gap-1.5">
@@ -364,7 +358,6 @@ function SessionEmotionCard({ session, result, phrases, analysing, breakdownRunn
     >
       <CardContent className="p-6 space-y-4">
 
-        {/* Header */}
         <CardHeader className="flex flex-row items-start justify-between gap-4 p-0">
           <div className="flex-1 min-w-0">
             <div className="flex items-center flex-wrap gap-2 mb-1">
@@ -388,12 +381,10 @@ function SessionEmotionCard({ session, result, phrases, analysing, breakdownRunn
           </div>
         </CardHeader>
 
-        {/* Transcript preview */}
         <p className="text-xs leading-relaxed line-clamp-2" style={{ color: "#64748b" }}>
           "{session.transcript.slice(0, 200)}{session.transcript.length > 200 ? "…" : ""}"
         </p>
 
-        {/* Per-card error */}
         {error && (
           <div className="rounded-lg px-3 py-2 text-xs flex items-center gap-2"
             style={{ backgroundColor: "#450a0a", border: "1px solid #ef444433", color: "#fca5a5" }}>
@@ -403,7 +394,6 @@ function SessionEmotionCard({ session, result, phrases, analysing, breakdownRunn
 
         {analysing && <AnalysingSpinner message="Detecting emotional tone…" />}
 
-        {/* Overall result */}
         {result && (
           <div className="rounded-xl p-4 space-y-3"
             style={{ backgroundColor: "#0a0f1e", border: "1px solid #1e293b" }}>
@@ -454,7 +444,6 @@ export function EmotionDetectionPanel({ sessions, className }) {
     ? Math.round(Object.values(results).reduce((s, r) => s + r.confidence, 0) / analysedCount)
     : null;
 
-  // Auto-run analysis when sessions appear
   useEffect(() => {
     sessions.forEach((session) => {
       if (analysedRef.current.has(session.id)) return;
@@ -491,7 +480,6 @@ export function EmotionDetectionPanel({ sessions, className }) {
   return (
     <section className={cn("space-y-6", className)}>
 
-      {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
           style={{ background: "linear-gradient(135deg,#7c3aed,#4f46e5)", boxShadow: "0 0 20px #7c3aed33" }}>
@@ -505,7 +493,6 @@ export function EmotionDetectionPanel({ sessions, className }) {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 rounded-xl overflow-hidden text-center"
         style={{ border: "1px solid #1e293b", backgroundColor: "#0a0f1e" }}>
         {[
@@ -521,7 +508,6 @@ export function EmotionDetectionPanel({ sessions, className }) {
         ))}
       </div>
 
-      {/* Emotion legend */}
       <div className="rounded-xl p-4" style={{ border: "1px solid #1e293b", backgroundColor: "#0a0f1e" }}>
         <p className="text-[10px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: "#475569" }}>
           Detectable emotions
@@ -531,7 +517,6 @@ export function EmotionDetectionPanel({ sessions, className }) {
         </div>
       </div>
 
-      {/* Session cards */}
       <CounterProvider>
         <div className="space-y-3">
           {sessions.map((session) => (
@@ -548,7 +533,6 @@ export function EmotionDetectionPanel({ sessions, className }) {
         </div>
       </CounterProvider>
 
-      {/* Overall mood summary */}
       {analysedCount > 0 && (
         <LiquidCard className="animate-in fade-in slide-in-from-bottom-4 duration-700">
           <CardContent className="p-5 space-y-3">
