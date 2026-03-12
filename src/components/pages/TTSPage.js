@@ -1,1232 +1,8 @@
-// import React, { useState, useEffect, useRef } from "react";
-// import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
-// import { Mic, Play, Pause, Download, X, Check, Volume2, History, RefreshCw } from "lucide-react";
-
-// // ─── Config ───────────────────────────────────────────────────────────────────
-// const API = "https://kartavya11-smart-tts-api.hf.space";
-
-// const HEADERS = {
-//     "Content-Type": "application/json",
-// };
-
-// const LANGUAGES = [
-//     { id: "hindi",     flag: "🇮🇳", name: "Hindi",     script: "हिंदी",    code: "hi" },
-//     { id: "english",   flag: "🌍",  name: "English",   script: "English",  code: "en" },
-//     { id: "tamil",     flag: "🏛️",  name: "Tamil",     script: "தமிழ்",   code: "ta" },
-//     { id: "telugu",    flag: "🌅",  name: "Telugu",    script: "తెలుగు",  code: "te" },
-//     { id: "malayalam", flag: "🌴",  name: "Malayalam", script: "മലയാളം", code: "ml" },
-//     { id: "bengali",   flag: "🎨",  name: "Bengali",   script: "বাংলা",   code: "bn" },
-// ];
-
-// const MOODS = [
-//     { id: "neutral", emoji: "😐", name: "Neutral", desc: "Balanced & Clear",   hex: "#FFFFFF" },
-//     { id: "happy",   emoji: "😊", name: "Happy",   desc: "Bright & Energetic", hex: "#F59E0B" },
-//     { id: "sad",     emoji: "😔", name: "Sad",     desc: "Soft & Gentle",      hex: "#3B82F6" },
-//     { id: "angry",   emoji: "😠", name: "Angry",   desc: "Bold & Intense",     hex: "#EF4444" },
-// ];
-
-// const PLACEHOLDERS = [
-//     "नमस्ते दुनिया...",
-//     "Hello, world...",
-//     "வணக்கம் உலகம்...",
-//     "হ্যালো বিশ্ব...",
-//     "నమస్కారం ప్రపంచం...",
-//     "നമസ്കാരം ലോകം...",
-// ];
-
-// // ─── Main Component ───────────────────────────────────────────────────────────
-// const SmartTTS = () => {
-//     const [isScrolled,         setIsScrolled]         = useState(false);
-//     const [placeholderIdx,     setPlaceholderIdx]     = useState(0);
-//     const [serverOnline,       setServerOnline]       = useState(null);
-//     const [showHistory,        setShowHistory]        = useState(false);
-
-//     const [text,               setText]               = useState("");
-//     const [activeLang,         setActiveLang]         = useState("hindi");
-//     const [activeGender,       setActiveGender]       = useState("female");
-//     const [activeMood,         setActiveMood]         = useState("neutral");
-
-//     const [isGenerating,       setIsGenerating]       = useState(false);
-//     const [generationSuccess,  setGenerationSuccess]  = useState(false);
-//     const [error,              setError]              = useState(null);
-
-//     const [showPlayer,         setShowPlayer]         = useState(false);
-//     const [isPlaying,          setIsPlaying]          = useState(false);
-//     const [audioURL,           setAudioURL]           = useState(null);
-//     const [progress,           setProgress]           = useState(0);
-//     const [duration,           setDuration]           = useState(0);
-//     const [currentTime,        setCurrentTime]        = useState(0);
-
-//     const [history,            setHistory]            = useState([]);
-
-//     const audioRef    = useRef(null);
-//     const { scrollY } = useScroll();
-//     const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]);
-//     const heroY       = useTransform(scrollY, [0, 400], [0, 100]);
-
-//     // ── Effects ──────────────────────────────────────────────────────────────
-//     useEffect(() => {
-//         const handleScroll = () => setIsScrolled(window.scrollY > 20);
-//         window.addEventListener("scroll", handleScroll);
-//         return () => window.removeEventListener("scroll", handleScroll);
-//     }, []);
-
-//     useEffect(() => {
-//         const interval = setInterval(
-//             () => setPlaceholderIdx(p => (p + 1) % PLACEHOLDERS.length),
-//             3000
-//         );
-//         return () => clearInterval(interval);
-//     }, []);
-
-//     // Check server status
-//     useEffect(() => {
-//         fetch(`${API}/`, { headers: HEADERS })
-//             .then(r => r.json())
-//             .then(d => setServerOnline(d.status === "running" || !!d.status))
-//             .catch(() => setServerOnline(false));
-//     }, []);
-
-//     // Audio event listeners
-//     useEffect(() => {
-//         const audio = audioRef.current;
-//         if (!audio) return;
-//         const onTime = () => {
-//             setCurrentTime(audio.currentTime);
-//             setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0);
-//         };
-//         const onLoad  = () => setDuration(audio.duration);
-//         const onEnd   = () => { setIsPlaying(false); setProgress(0); setCurrentTime(0); };
-//         audio.addEventListener("timeupdate",     onTime);
-//         audio.addEventListener("loadedmetadata", onLoad);
-//         audio.addEventListener("ended",          onEnd);
-//         return () => {
-//             audio.removeEventListener("timeupdate",     onTime);
-//             audio.removeEventListener("loadedmetadata", onLoad);
-//             audio.removeEventListener("ended",          onEnd);
-//         };
-//     }, [audioURL]);
-
-//     // ── Helpers ───────────────────────────────────────────────────────────────
-//     const formatTime = (s) => {
-//         if (!s || isNaN(s)) return "0:00";
-//         const m   = Math.floor(s / 60);
-//         const sec = Math.floor(s % 60).toString().padStart(2, "0");
-//         return `${m}:${sec}`;
-//     };
-
-//     const togglePlay = () => {
-//         const audio = audioRef.current;
-//         if (!audio) return;
-//         if (isPlaying) { audio.pause(); setIsPlaying(false); }
-//         else           { audio.play();  setIsPlaying(true);  }
-//     };
-
-//     const handleDownload = () => {
-//         if (!audioURL) return;
-//         const a    = document.createElement("a");
-//         a.href     = audioURL;
-//         a.download = `SmartTTS_${activeLang}_${activeMood}_${Date.now()}.mp3`;
-//         a.click();
-//     };
-
-//     const fetchHistory = async () => {
-//         try {
-//             const res  = await fetch(`${API}/history?limit=10`, { headers: HEADERS });
-//             const data = await res.json();
-//             setHistory(data.history ?? []);
-//         } catch { }
-//     };
-
-//     // ── Generate ──────────────────────────────────────────────────────────────
-//     const handleGenerate = async () => {
-//         if (!text.trim() || isGenerating) return;
-//         setIsGenerating(true);
-//         setError(null);
-//         setShowPlayer(false);
-
-//         try {
-//             const res = await fetch(`${API}/generate`, {
-//                 method:  "POST",
-//                 headers: HEADERS,
-//                 body:    JSON.stringify({
-//                     text,
-//                     voice_key: `${activeLang}_${activeGender}`,
-//                     mood:       activeMood,
-//                 }),
-//             });
-
-//             const data = await res.json();
-//             if (!res.ok) throw new Error(data.detail || data.error || "Generation failed");
-
-//             // Fix audio URL - prepend API base URL
-//             const fullAudioURL = API + data.audio_url;
-//             setAudioURL(fullAudioURL);
-
-//             setIsGenerating(false);
-//             setGenerationSuccess(true);
-
-//             setTimeout(() => {
-//                 setGenerationSuccess(false);
-//                 setShowPlayer(true);
-//                 setTimeout(() => {
-//                     audioRef.current?.play();
-//                     setIsPlaying(true);
-//                 }, 300);
-//             }, 800);
-
-//         } catch (e) {
-//             setIsGenerating(false);
-//             setError(e.message);
-//         }
-//     };
-
-//     // ── Render ────────────────────────────────────────────────────────────────
-//     return (
-//         <div className="min-h-screen w-full overflow-hidden bg-[#080808] text-white font-sans selection:bg-[#7C3AED]/30">
-
-//             {/* Hidden audio element */}
-//             <audio ref={audioRef} src={audioURL || ""} />
-
-//             {/* ── Background ─────────────────────────────────────────────────── */}
-//             <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-//                 <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-[#7C3AED]/10 blur-[120px] animate-pulse" />
-//                 <div className="absolute top-[20%] right-[-10%] w-[35%] h-[35%] rounded-full bg-[#06B6D4]/10 blur-[120px] animate-pulse" style={{ animationDelay: "1s" }} />
-//                 <div className="absolute bottom-[-10%] left-[30%] w-[30%] h-[30%] rounded-full bg-[#7C3AED]/5 blur-[120px] animate-pulse" style={{ animationDelay: "2s" }} />
-//                 <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` }} />
-//                 <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:100px_100px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)]" />
-//             </div>
-
-//             {/* ── Navigation ─────────────────────────────────────────────────── */}
-//             <nav className={`fixed top-6 left-1/2 -translate-x-1/2 z-40 transition-all duration-500 flex items-center justify-between px-6 py-4 rounded-full border border-white/10 bg-white/5 backdrop-blur-xl ${isScrolled ? "w-[90%] max-w-2xl" : "w-[95%] max-w-4xl"}`}>
-//                 <div className="flex items-center gap-2">
-//                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#7C3AED] to-[#06B6D4] flex items-center justify-center">
-//                         <Volume2 className="w-4 h-4 text-white" />
-//                     </div>
-//                     <span className="font-bold text-lg tracking-tight">SmartTTS</span>
-//                 </div>
-
-//                 <div className="hidden md:flex items-center gap-8 text-sm text-white/60">
-//                     <a href="#interface" className="hover:text-white transition-colors">Studio</a>
-//                     <button
-//                         onClick={() => { fetchHistory(); setShowHistory(v => !v); }}
-//                         className="hover:text-white transition-colors flex items-center gap-1"
-//                     >
-//                         <History size={14} /> History
-//                     </button>
-//                 </div>
-
-//                 <div className="flex items-center gap-3">
-//                     <div className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
-//                         <span className={`w-2 h-2 rounded-full ${serverOnline === null ? "bg-gray-400 animate-pulse" : serverOnline ? "bg-green-400 animate-pulse" : "bg-red-400"}`} />
-//                         <span className="text-white/60 hidden sm:block">
-//                             {serverOnline === null ? "Checking…" : serverOnline ? "AI Online" : "Offline"}
-//                         </span>
-//                     </div>
-//                     <button className="px-5 py-2 rounded-full bg-gradient-to-br from-[#7C3AED] to-[#06B6D4] text-white text-sm font-bold shadow-lg shadow-[#7C3AED]/20 hover:scale-105 active:scale-95 transition-all">
-//                         Try Now
-//                     </button>
-//                 </div>
-//             </nav>
-
-//             {/* ── Hero ───────────────────────────────────────────────────────── */}
-//             <motion.section
-//                 className="relative h-screen flex flex-col items-center justify-center pt-20 px-4 text-center z-10"
-//                 style={{ opacity: heroOpacity, y: heroY }}
-//             >
-//                 <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-//                     <h1 className="text-6xl md:text-[8rem] font-black leading-[0.9] tracking-tighter">
-//                         <span className="block text-white">SPEAK IN</span>
-//                         <span className="block bg-clip-text text-transparent bg-gradient-to-r from-[#7C3AED] to-[#06B6D4]">
-//                             EVERY VOICE
-//                         </span>
-//                     </h1>
-//                     <p className="mt-8 text-xl md:text-2xl text-white/40 font-light max-w-2xl mx-auto">
-//                         The Voice of Intelligent India. Premium, emotional, human-like text-to-speech in 6 Indian languages.
-//                     </p>
-//                     <motion.a
-//                         href="#interface"
-//                         className="inline-flex items-center gap-2 mt-10 px-8 py-4 rounded-full bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] text-white font-bold text-lg shadow-2xl shadow-[#7C3AED]/30 hover:scale-105 active:scale-95 transition-all"
-//                         whileHover={{ scale: 1.05 }}
-//                         whileTap={{ scale: 0.95 }}
-//                     >
-//                         <Mic size={20} /> Start Speaking
-//                     </motion.a>
-//                 </motion.div>
-
-//                 <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-10 pointer-events-none -z-10">
-//                     {[...Array(50)].map((_, i) => (
-//                         <motion.div
-//                             key={i}
-//                             className="w-1.5 bg-gradient-to-b from-[#7C3AED] to-[#06B6D4] rounded-full"
-//                             animate={{ height: [20, Math.random() * 200 + 40, 20] }}
-//                             transition={{ duration: Math.random() * 1.5 + 0.8, repeat: Infinity, ease: "easeInOut", delay: Math.random() * 2 }}
-//                         />
-//                     ))}
-//                 </div>
-
-//                 <motion.div
-//                     className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/30 text-xs"
-//                     animate={{ y: [0, 8, 0] }}
-//                     transition={{ duration: 2, repeat: Infinity }}
-//                 >
-//                     <span>Scroll to Studio</span>
-//                     <div className="w-px h-8 bg-gradient-to-b from-white/30 to-transparent" />
-//                 </motion.div>
-//             </motion.section>
-
-//             {/* ── Interface Card ─────────────────────────────────────────────── */}
-//             <section id="interface" className="relative z-10 px-4 pb-40">
-//                 <motion.div
-//                     initial={{ opacity: 0, y: 60 }}
-//                     whileInView={{ opacity: 1, y: 0 }}
-//                     viewport={{ once: true }}
-//                     transition={{ duration: 0.8 }}
-//                     className="max-w-3xl mx-auto"
-//                 >
-//                     <div className="h-px w-full bg-gradient-to-r from-transparent via-[#7C3AED] to-transparent mb-0 rounded-t-[32px]" />
-
-//                     <div className="bg-white/[0.03] backdrop-blur-3xl border border-white/10 rounded-[32px] p-6 md:p-12 shadow-2xl">
-
-//                         <div className="flex items-center justify-between mb-8">
-//                             <div>
-//                                 <h2 className="text-2xl font-black tracking-tight">Voice Studio</h2>
-//                                 <p className="text-white/40 text-sm mt-1">Craft your perfect voice</p>
-//                             </div>
-//                             <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#7C3AED] to-[#06B6D4] flex items-center justify-center">
-//                                 <Mic size={18} className="text-white" />
-//                             </div>
-//                         </div>
-
-//                         {/* ── Text Input ─────────────────────────────────────────── */}
-//                         <div className="relative group mb-10">
-//                             <div className="absolute -inset-0.5 bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] rounded-[22px] blur opacity-0 group-focus-within:opacity-30 transition duration-500" />
-//                             <textarea
-//                                 value={text}
-//                                 onChange={e => setText(e.target.value)}
-//                                 placeholder={PLACEHOLDERS[placeholderIdx]}
-//                                 maxLength={5000}
-//                                 className="relative w-full h-44 bg-black/40 border border-white/5 rounded-[20px] p-6 text-white text-lg placeholder:text-white/20 focus:outline-none resize-none transition-all leading-relaxed focus:border-[#7C3AED]/40"
-//                             />
-//                             <div className={`absolute bottom-4 right-5 text-xs font-mono ${text.length > 4800 ? "text-red-400" : "text-white/30"}`}>
-//                                 {text.length} / 5000
-//                             </div>
-//                         </div>
-
-//                         <div className="space-y-10">
-
-//                             {/* ── Language ───────────────────────────────────────────── */}
-//                             <div>
-//                                 <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold block mb-4">
-//                                     Select Language
-//                                 </span>
-//                                 <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-//                                     {LANGUAGES.map(lang => (
-//                                         <motion.button
-//                                             key={lang.id}
-//                                             onClick={() => setActiveLang(lang.id)}
-//                                             whileHover={{ scale: 1.05 }}
-//                                             whileTap={{ scale: 0.95 }}
-//                                             className={`flex flex-col items-center justify-center shrink-0 w-24 h-24 rounded-2xl border transition-all duration-300 ${activeLang === lang.id
-//                                                 ? "bg-[#7C3AED]/20 border-[#7C3AED] shadow-lg shadow-[#7C3AED]/20"
-//                                                 : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10"
-//                                             }`}
-//                                         >
-//                                             <span className="text-3xl mb-1">{lang.flag}</span>
-//                                             <span className="text-xs font-bold">{lang.name}</span>
-//                                             <span className="text-[10px] opacity-40">{lang.script}</span>
-//                                         </motion.button>
-//                                     ))}
-//                                 </div>
-//                             </div>
-
-//                             {/* ── Gender + Mood ──────────────────────────────────────── */}
-//                             <div className="flex flex-col md:flex-row gap-8">
-
-//                                 {/* Gender */}
-//                                 <div className="flex-1">
-//                                     <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold block mb-4">
-//                                         Voice Type
-//                                     </span>
-//                                     <div className="bg-black/40 border border-white/5 p-1 rounded-2xl flex relative">
-//                                         <motion.div
-//                                             className="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-gradient-to-br from-[#7C3AED] to-[#06B6D4] rounded-xl shadow-lg"
-//                                             animate={{ left: activeGender === "male" ? "4px" : "50%" }}
-//                                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-//                                         />
-//                                         {["male", "female"].map(g => (
-//                                             <button
-//                                                 key={g}
-//                                                 onClick={() => setActiveGender(g)}
-//                                                 className={`relative z-10 flex-1 py-3 text-sm font-bold transition-colors ${activeGender === g ? "text-white" : "text-white/40"}`}
-//                                             >
-//                                                 {g === "male" ? "♂ Male" : "♀ Female"}
-//                                             </button>
-//                                         ))}
-//                                     </div>
-//                                 </div>
-
-//                                 {/* Mood */}
-//                                 <div className="flex-[2]">
-//                                     <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold block mb-4">
-//                                         Emotion & Tone
-//                                     </span>
-//                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-//                                         {MOODS.map(mood => (
-//                                             <motion.button
-//                                                 key={mood.id}
-//                                                 onClick={() => setActiveMood(mood.id)}
-//                                                 whileHover={{ scale: 1.05 }}
-//                                                 whileTap={{ scale: 0.95 }}
-//                                                 className="flex flex-col p-3 rounded-2xl border transition-all duration-200"
-//                                                 style={{
-//                                                     background:   activeMood === mood.id ? `${mood.hex}15` : "rgba(255,255,255,0.03)",
-//                                                     borderColor:  activeMood === mood.id ? mood.hex : "transparent",
-//                                                     boxShadow:    activeMood === mood.id ? `0 0 20px ${mood.hex}25` : "none",
-//                                                 }}
-//                                             >
-//                                                 <span className="text-2xl mb-1">{mood.emoji}</span>
-//                                                 <span className="text-xs font-bold">{mood.name}</span>
-//                                                 <span className="text-[10px] text-white/40">{mood.desc}</span>
-//                                             </motion.button>
-//                                         ))}
-//                                     </div>
-//                                 </div>
-//                             </div>
-
-//                             {/* ── Error ──────────────────────────────────────────────── */}
-//                             <AnimatePresence>
-//                                 {error && (
-//                                     <motion.div
-//                                         initial={{ opacity: 0, y: -10 }}
-//                                         animate={{ opacity: 1, y: 0 }}
-//                                         exit={{ opacity: 0 }}
-//                                         className="flex items-center gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm"
-//                                     >
-//                                         <X size={16} className="shrink-0" />
-//                                         {error}
-//                                     </motion.div>
-//                                 )}
-//                             </AnimatePresence>
-
-//                             {/* ── Generate Button ────────────────────────────────────── */}
-//                             <motion.button
-//                                 onClick={handleGenerate}
-//                                 disabled={isGenerating || !text.trim()}
-//                                 whileHover={!isGenerating && text.trim() ? { scale: 1.02 } : {}}
-//                                 whileTap={!isGenerating && text.trim() ? { scale: 0.98 } : {}}
-//                                 className={`w-full h-16 rounded-2xl relative overflow-hidden transition-all duration-300 font-bold text-lg ${!text.trim() || isGenerating ? "opacity-50 cursor-not-allowed" : ""}`}
-//                             >
-//                                 <div className="absolute inset-0 bg-gradient-to-r from-[#7C3AED] to-[#06B6D4]" />
-//                                 <div className="relative z-10 flex items-center justify-center gap-3">
-//                                     {isGenerating ? (
-//                                         <span className="flex items-center gap-3">
-//                                             <RefreshCw size={20} className="animate-spin" />
-//                                             Generating your voice…
-//                                         </span>
-//                                     ) : generationSuccess ? (
-//                                         <span className="flex items-center gap-3">
-//                                             <Check size={20} /> Voice Ready!
-//                                         </span>
-//                                     ) : (
-//                                         <span className="flex items-center gap-3">
-//                                             <Mic size={20} /> Generate Speech
-//                                         </span>
-//                                     )}
-//                                 </div>
-//                                 {isGenerating && (
-//                                     <motion.div
-//                                         className="absolute bottom-0 left-0 h-1 bg-white/40"
-//                                         initial={{ width: "0%" }}
-//                                         animate={{ width: "100%" }}
-//                                         transition={{ duration: 8, ease: "linear" }}
-//                                     />
-//                                 )}
-//                             </motion.button>
-
-//                         </div>
-//                     </div>
-//                 </motion.div>
-
-//                 {/* ── History Panel ──────────────────────────────────────────── */}
-//                 <AnimatePresence>
-//                     {showHistory && (
-//                         <motion.div
-//                             initial={{ opacity: 0, y: 20 }}
-//                             animate={{ opacity: 1, y: 0 }}
-//                             exit={{ opacity: 0, y: 20 }}
-//                             className="max-w-3xl mx-auto mt-6 bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-[24px] p-6"
-//                         >
-//                             <div className="flex items-center justify-between mb-6">
-//                                 <h3 className="font-bold text-white/80 uppercase tracking-widest text-xs">Recent Generations</h3>
-//                                 <button onClick={() => setShowHistory(false)} className="text-white/40 hover:text-white"><X size={16} /></button>
-//                             </div>
-//                             {history.length === 0 ? (
-//                                 <p className="text-center text-white/30 py-8 text-sm">No history yet. Generate your first voice!</p>
-//                             ) : (
-//                                 <div className="space-y-3">
-//                                     {history.map(h => (
-//                                         <div key={h.id} className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 hover:bg-white/8 transition-colors">
-//                                             <div className="flex gap-2 shrink-0">
-//                                                 <span className="px-2 py-1 rounded-full bg-[#7C3AED]/20 border border-[#7C3AED]/30 text-[10px] text-[#a78bfa] font-bold uppercase">{h.voice_key}</span>
-//                                                 <span className="px-2 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] text-white/60 font-bold uppercase">{h.mood}</span>
-//                                             </div>
-//                                             <p className="flex-1 text-sm text-white/50 truncate">{h.text}</p>
-//                                             <span className="text-[10px] font-mono text-white/30 shrink-0">{new Date(h.created_at).toLocaleTimeString()}</span>
-//                                             {h.audio_url && (
-//                                                 <a href={h.audio_url} download className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors">
-//                                                     <Download size={14} className="text-white/60" />
-//                                                 </a>
-//                                             )}
-//                                         </div>
-//                                     ))}
-//                                 </div>
-//                             )}
-//                         </motion.div>
-//                     )}
-//                 </AnimatePresence>
-//             </section>
-
-//             {/* ── Floating Audio Player ──────────────────────────────────────── */}
-//             <AnimatePresence>
-//                 {showPlayer && audioURL && (
-//                     <motion.div
-//                         initial={{ y: 120, opacity: 0 }}
-//                         animate={{ y: 0, opacity: 1 }}
-//                         exit={{ y: 120, opacity: 0 }}
-//                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-//                         className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[92%] max-w-2xl z-50"
-//                     >
-//                         <div className="absolute -inset-1 bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] rounded-[28px] blur-xl opacity-20" />
-//                         <div className="relative bg-[#0d0d0f]/90 backdrop-blur-2xl border border-white/15 rounded-3xl p-5 shadow-2xl">
-//                             <div className="flex items-center gap-4">
-
-//                                 {/* Play button */}
-//                                 <motion.button
-//                                     onClick={togglePlay}
-//                                     whileHover={{ scale: 1.1 }}
-//                                     whileTap={{ scale: 0.9 }}
-//                                     className="w-14 h-14 shrink-0 rounded-full bg-gradient-to-br from-[#7C3AED] to-[#06B6D4] flex items-center justify-center shadow-xl shadow-[#7C3AED]/30"
-//                                 >
-//                                     {isPlaying
-//                                         ? <Pause size={20} className="text-white" />
-//                                         : <Play  size={20} className="text-white ml-1" />
-//                                     }
-//                                 </motion.button>
-
-//                                 {/* Progress */}
-//                                 <div className="flex-1 flex flex-col gap-2">
-//                                     <div className="flex justify-between items-center">
-//                                         <div className="flex gap-2">
-//                                             <span className="text-[10px] uppercase tracking-widest text-white/40 font-mono">
-//                                                 {LANGUAGES.find(l => l.id === activeLang)?.name}
-//                                             </span>
-//                                             <span className="text-[10px] uppercase tracking-widest text-white/40 font-mono">·</span>
-//                                             <span className="text-[10px] uppercase tracking-widest text-white/40 font-mono">{activeMood}</span>
-//                                         </div>
-//                                         <span className="text-[10px] font-mono text-white/40">
-//                                             {formatTime(currentTime)} / {formatTime(duration)}
-//                                         </span>
-//                                     </div>
-//                                     <div className="h-1.5 bg-white/10 rounded-full overflow-hidden cursor-pointer">
-//                                         <motion.div
-//                                             className="h-full bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] rounded-full"
-//                                             style={{ width: `${progress}%` }}
-//                                             transition={{ duration: 0.1 }}
-//                                         />
-//                                     </div>
-//                                     <div className="flex items-center gap-0.5 h-4">
-//                                         {[...Array(32)].map((_, i) => (
-//                                             <motion.div
-//                                                 key={i}
-//                                                 className="flex-1 bg-gradient-to-b from-[#7C3AED] to-[#06B6D4] rounded-full opacity-60"
-//                                                 animate={isPlaying
-//                                                     ? { height: [`${Math.random() * 60 + 20}%`, `${Math.random() * 60 + 20}%`] }
-//                                                     : { height: "30%" }
-//                                                 }
-//                                                 transition={{ duration: 0.4, repeat: Infinity, repeatType: "reverse", delay: i * 0.02 }}
-//                                             />
-//                                         ))}
-//                                     </div>
-//                                 </div>
-
-//                                 {/* Actions */}
-//                                 <div className="flex items-center gap-2 shrink-0">
-//                                     <motion.button
-//                                         whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-//                                         onClick={handleDownload}
-//                                         className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
-//                                     >
-//                                         <Download size={16} className="text-white/70" />
-//                                     </motion.button>
-//                                     <motion.button
-//                                         whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-//                                         onClick={() => { setShowPlayer(false); setIsPlaying(false); audioRef.current?.pause(); }}
-//                                         className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
-//                                     >
-//                                         <X size={16} className="text-white/70" />
-//                                     </motion.button>
-//                                 </div>
-
-//                             </div>
-//                         </div>
-//                     </motion.div>
-//                 )}
-//             </AnimatePresence>
-
-//         </div>
-//     );
-// };
-
-// export default SmartTTS;
-// import React, { useState, useEffect, useRef } from "react";
-// import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
-// import { Mic, Play, Pause, Download, X, Check, Volume2, History, RefreshCw } from "lucide-react";
-// // ✅ replace with this (relative path from your file location)
-// import { EmotionDetectionPanel } from "../ui/emotion-detection-panel";
-
-// // ─── Config ───────────────────────────────────────────────────────────────────
-// const API = "https://kartavya11-smart-tts-api.hf.space";
-
-// const HEADERS = {
-//     "Content-Type": "application/json",
-// };
-
-// const LANGUAGES = [
-//     { id: "hindi",     flag: "🇮🇳", name: "Hindi",     script: "हिंदी",      code: "hi", accuracy: 97 },
-//     { id: "english",   flag: "🌍",  name: "English",   script: "English",    code: "en", accuracy: 99 },
-//     { id: "bengali",   flag: "🎨",  name: "Bengali",   script: "বাংলা",     code: "bn", accuracy: 99 },
-//     { id: "tamil",     flag: "🏛️",  name: "Tamil",     script: "தமிழ்",    code: "ta", accuracy: 97 },
-//     { id: "telugu",    flag: "🌅",  name: "Telugu",    script: "తెలుగు",   code: "te", accuracy: 93 },
-//     { id: "malayalam", flag: "🌴",  name: "Malayalam", script: "മലയാളം",  code: "ml", accuracy: 99 },
-//     { id: "kannada",   flag: "🌻",  name: "Kannada",   script: "ಕನ್ನಡ",   code: "kn", accuracy: 97 },
-//     { id: "gujarati",  flag: "🦁",  name: "Gujarati",  script: "ગુજરાતી", code: "gu", accuracy: 99 },
-//     { id: "punjabi",   flag: "🌾",  name: "Punjabi",   script: "ਪੰਜਾਬੀ",  code: "pa", accuracy: 98 },
-// ];
-
-// const MOODS = [
-//     { id: "neutral", emoji: "😐", name: "Neutral", desc: "Balanced & Clear",   hex: "#FFFFFF" },
-//     { id: "happy",   emoji: "😊", name: "Happy",   desc: "Bright & Energetic", hex: "#F59E0B" },
-//     { id: "sad",     emoji: "😔", name: "Sad",     desc: "Soft & Gentle",      hex: "#3B82F6" },
-//     { id: "angry",   emoji: "😠", name: "Angry",   desc: "Bold & Intense",     hex: "#EF4444" },
-// ];
-
-// const PLACEHOLDERS = [
-//     "नमस्ते दुनिया...",
-//     "Hello, world...",
-//     "வணக்கம் உலகம்...",
-//     "হ্যালো বিশ্ব...",
-//     "నమస్కారం ప్రపంచం...",
-//     "നമസ്കാരം ലോകം...",
-// ];
-
-// // ─── Main Component ───────────────────────────────────────────────────────────
-// const SmartTTS = () => {
-//     const [isScrolled,         setIsScrolled]         = useState(false);
-//     const [placeholderIdx,     setPlaceholderIdx]     = useState(0);
-//     const [serverOnline,       setServerOnline]       = useState(null);
-//     const [showHistory,        setShowHistory]        = useState(false);
-
-//     const [text,               setText]               = useState("");
-//     const [activeLang,         setActiveLang]         = useState("hindi");
-//     const [activeGender,       setActiveGender]       = useState("female");
-//     const [activeMood,         setActiveMood]         = useState("neutral");
-
-//     const [isGenerating,       setIsGenerating]       = useState(false);
-//     const [generationSuccess,  setGenerationSuccess]  = useState(false);
-//     const [error,              setError]              = useState(null);
-
-//     const [showPlayer,         setShowPlayer]         = useState(false);
-//     const [isPlaying,          setIsPlaying]          = useState(false);
-//     const [audioURL,           setAudioURL]           = useState(null);
-//     const [progress,           setProgress]           = useState(0);
-//     const [duration,           setDuration]           = useState(0);
-//     const [currentTime,        setCurrentTime]        = useState(0);
-
-//     const [history,            setHistory]            = useState([]);
-
-//     // ── NEW: sessions for EmotionDetectionPanel ───────────────────────────────
-//     const [sessions,           setSessions]           = useState([]);
-
-//     const audioRef    = useRef(null);
-//     const { scrollY } = useScroll();
-//     const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]);
-//     const heroY       = useTransform(scrollY, [0, 400], [0, 100]);
-
-//     // ── Effects ──────────────────────────────────────────────────────────────
-//     useEffect(() => {
-//         const handleScroll = () => setIsScrolled(window.scrollY > 20);
-//         window.addEventListener("scroll", handleScroll);
-//         return () => window.removeEventListener("scroll", handleScroll);
-//     }, []);
-
-//     useEffect(() => {
-//         const interval = setInterval(
-//             () => setPlaceholderIdx(p => (p + 1) % PLACEHOLDERS.length),
-//             3000
-//         );
-//         return () => clearInterval(interval);
-//     }, []);
-
-//     // Check server status
-//     useEffect(() => {
-//         fetch(`${API}/`, { headers: HEADERS })
-//             .then(r => r.json())
-//             .then(d => setServerOnline(d.status === "running" || !!d.status))
-//             .catch(() => setServerOnline(false));
-//     }, []);
-
-//     // Audio event listeners
-//     useEffect(() => {
-//         const audio = audioRef.current;
-//         if (!audio) return;
-//         const onTime = () => {
-//             setCurrentTime(audio.currentTime);
-//             setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0);
-//         };
-//         const onLoad  = () => setDuration(audio.duration);
-//         const onEnd   = () => { setIsPlaying(false); setProgress(0); setCurrentTime(0); };
-//         audio.addEventListener("timeupdate",     onTime);
-//         audio.addEventListener("loadedmetadata", onLoad);
-//         audio.addEventListener("ended",          onEnd);
-//         return () => {
-//             audio.removeEventListener("timeupdate",     onTime);
-//             audio.removeEventListener("loadedmetadata", onLoad);
-//             audio.removeEventListener("ended",          onEnd);
-//         };
-//     }, [audioURL]);
-
-//     // ── Helpers ───────────────────────────────────────────────────────────────
-//     const formatTime = (s) => {
-//         if (!s || isNaN(s)) return "0:00";
-//         const m   = Math.floor(s / 60);
-//         const sec = Math.floor(s % 60).toString().padStart(2, "0");
-//         return `${m}:${sec}`;
-//     };
-
-//     const togglePlay = () => {
-//         const audio = audioRef.current;
-//         if (!audio) return;
-//         if (isPlaying) { audio.pause(); setIsPlaying(false); }
-//         else           { audio.play();  setIsPlaying(true);  }
-//     };
-
-//     const handleDownload = () => {
-//         if (!audioURL) return;
-//         const a    = document.createElement("a");
-//         a.href     = audioURL;
-//         a.download = `SmartTTS_${activeLang}_${activeMood}_${Date.now()}.mp3`;
-//         a.click();
-//     };
-
-//     const fetchHistory = async () => {
-//         try {
-//             const res  = await fetch(`${API}/history?limit=10`, { headers: HEADERS });
-//             const data = await res.json();
-//             const hist = data.history ?? [];
-//             setHistory(hist);
-
-//             // ── Sync history into sessions for EmotionDetectionPanel ──────────
-//             const mapped = hist.map((h, i) => ({
-//                 id:         h.id ?? `hist-${i}`,
-//                 title:      `${h.voice_key ?? "Session"} · ${h.mood ?? "neutral"}`,
-//                 date:       new Date(h.created_at).toLocaleDateString("en-IN", {
-//                                 day: "numeric", month: "short", year: "numeric"
-//                             }),
-//                 duration:   h.duration ?? "—",
-//                 transcript: h.text ?? "",
-//             }));
-//             setSessions(mapped);
-//         } catch { }
-//     };
-
-//     // ── Generate ──────────────────────────────────────────────────────────────
-// const handleGenerate = async () => {
-//     if (!text.trim() || isGenerating) return;
-//     setIsGenerating(true);
-//     setError(null);
-//     setShowPlayer(false);
-
-//     try {
-//         const res = await fetch(`${API}/generate`, {
-//             method:  "POST",
-//             headers: { "Content-Type": "application/json" },
-//             body: JSON.stringify({
-//                 text,
-//                 voice_key: `${activeLang}_${activeGender}`,  // e.g. "hindi_female"
-//                 mood:       activeMood,
-//             }),
-//         });
-
-//         const data = await res.json();
-//         if (!res.ok || !data.success) throw new Error(data.error || "Generation failed");
-
-//         // ✅ matches your actual API response
-//         const fullAudioURL = `${API}${data.audio_url}`;
-//         setAudioURL(fullAudioURL);
-
-//         const newSession = {
-//             id:         `session-${Date.now()}`,
-//             title:      `${data.language} · ${activeMood}`,
-//             date:       new Date().toLocaleDateString("en-IN", {
-//                             day: "numeric", month: "short", year: "numeric"
-//                         }),
-//             duration:   "—",
-//             transcript: text,
-//         };
-//         setSessions(prev => [newSession, ...prev]);
-
-//         setIsGenerating(false);
-//         setGenerationSuccess(true);
-
-//         setTimeout(() => {
-//             setGenerationSuccess(false);
-//             setShowPlayer(true);
-//             setTimeout(() => {
-//                 audioRef.current?.play();
-//                 setIsPlaying(true);
-//             }, 300);
-//         }, 800);
-
-//     } catch (e) {
-//         setIsGenerating(false);
-//         setError(e.message);
-//     }
-// };
-
-//     // ── Render ────────────────────────────────────────────────────────────────
-//     return (
-//         <div className="min-h-screen w-full overflow-hidden bg-[#080808] text-white font-sans selection:bg-[#7C3AED]/30">
-
-//             {/* Hidden audio element */}
-//             <audio ref={audioRef} src={audioURL || ""} />
-
-//             {/* ── Background ─────────────────────────────────────────────────── */}
-//             <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-//                 <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-[#7C3AED]/10 blur-[120px] animate-pulse" />
-//                 <div className="absolute top-[20%] right-[-10%] w-[35%] h-[35%] rounded-full bg-[#06B6D4]/10 blur-[120px] animate-pulse" style={{ animationDelay: "1s" }} />
-//                 <div className="absolute bottom-[-10%] left-[30%] w-[30%] h-[30%] rounded-full bg-[#7C3AED]/5 blur-[120px] animate-pulse" style={{ animationDelay: "2s" }} />
-//                 <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` }} />
-//                 <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:100px_100px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)]" />
-//             </div>
-
-//             {/* ── Navigation ─────────────────────────────────────────────────── */}
-//             <nav className={`fixed top-6 left-1/2 -translate-x-1/2 z-40 transition-all duration-500 flex items-center justify-between px-6 py-4 rounded-full border border-white/10 bg-white/5 backdrop-blur-xl ${isScrolled ? "w-[90%] max-w-2xl" : "w-[95%] max-w-4xl"}`}>
-//                 <div className="flex items-center gap-2">
-//                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#7C3AED] to-[#06B6D4] flex items-center justify-center">
-//                         <Volume2 className="w-4 h-4 text-white" />
-//                     </div>
-//                     <span className="font-bold text-lg tracking-tight">SmartTTS</span>
-//                 </div>
-
-//                 <div className="hidden md:flex items-center gap-8 text-sm text-white/60">
-//                     <a href="#interface" className="hover:text-white transition-colors">Studio</a>
-//                     <a href="#emotions" className="hover:text-white transition-colors">Emotions</a>
-//                     <button
-//                         onClick={() => { fetchHistory(); setShowHistory(v => !v); }}
-//                         className="hover:text-white transition-colors flex items-center gap-1"
-//                     >
-//                         <History size={14} /> History
-//                     </button>
-//                 </div>
-
-//                 <div className="flex items-center gap-3">
-//                     <div className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
-//                         <span className={`w-2 h-2 rounded-full ${serverOnline === null ? "bg-gray-400 animate-pulse" : serverOnline ? "bg-green-400 animate-pulse" : "bg-red-400"}`} />
-//                         <span className="text-white/60 hidden sm:block">
-//                             {serverOnline === null ? "Checking…" : serverOnline ? "AI Online" : "Offline"}
-//                         </span>
-//                     </div>
-//                     <button className="px-5 py-2 rounded-full bg-gradient-to-br from-[#7C3AED] to-[#06B6D4] text-white text-sm font-bold shadow-lg shadow-[#7C3AED]/20 hover:scale-105 active:scale-95 transition-all">
-//                         Try Now
-//                     </button>
-//                 </div>
-//             </nav>
-
-//             {/* ── Hero ───────────────────────────────────────────────────────── */}
-//             <motion.section
-//                 className="relative h-screen flex flex-col items-center justify-center pt-20 px-4 text-center z-10"
-//                 style={{ opacity: heroOpacity, y: heroY }}
-//             >
-//                 <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-//                     <h1 className="text-6xl md:text-[8rem] font-black leading-[0.9] tracking-tighter">
-//                         <span className="block text-white">SPEAK IN</span>
-//                         <span className="block bg-clip-text text-transparent bg-gradient-to-r from-[#7C3AED] to-[#06B6D4]">
-//                             EVERY VOICE
-//                         </span>
-//                     </h1>
-//                     <p className="mt-8 text-xl md:text-2xl text-white/40 font-light max-w-2xl mx-auto">
-//                         The Voice of Intelligent India. Premium, emotional, human-like text-to-speech in 6 Indian languages.
-//                     </p>
-//                     <motion.a
-//                         href="#interface"
-//                         className="inline-flex items-center gap-2 mt-10 px-8 py-4 rounded-full bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] text-white font-bold text-lg shadow-2xl shadow-[#7C3AED]/30 hover:scale-105 active:scale-95 transition-all"
-//                         whileHover={{ scale: 1.05 }}
-//                         whileTap={{ scale: 0.95 }}
-//                     >
-//                         <Mic size={20} /> Start Speaking
-//                     </motion.a>
-//                 </motion.div>
-
-//                 <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-10 pointer-events-none -z-10">
-//                     {[...Array(50)].map((_, i) => (
-//                         <motion.div
-//                             key={i}
-//                             className="w-1.5 bg-gradient-to-b from-[#7C3AED] to-[#06B6D4] rounded-full"
-//                             animate={{ height: [20, Math.random() * 200 + 40, 20] }}
-//                             transition={{ duration: Math.random() * 1.5 + 0.8, repeat: Infinity, ease: "easeInOut", delay: Math.random() * 2 }}
-//                         />
-//                     ))}
-//                 </div>
-
-//                 <motion.div
-//                     className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/30 text-xs"
-//                     animate={{ y: [0, 8, 0] }}
-//                     transition={{ duration: 2, repeat: Infinity }}
-//                 >
-//                     <span>Scroll to Studio</span>
-//                     <div className="w-px h-8 bg-gradient-to-b from-white/30 to-transparent" />
-//                 </motion.div>
-//             </motion.section>
-
-//             {/* ── Interface Card ─────────────────────────────────────────────── */}
-//             <section id="interface" className="relative z-10 px-4 pb-20">
-//                 <motion.div
-//                     initial={{ opacity: 0, y: 60 }}
-//                     whileInView={{ opacity: 1, y: 0 }}
-//                     viewport={{ once: true }}
-//                     transition={{ duration: 0.8 }}
-//                     className="max-w-3xl mx-auto"
-//                 >
-//                     <div className="h-px w-full bg-gradient-to-r from-transparent via-[#7C3AED] to-transparent mb-0 rounded-t-[32px]" />
-
-//                     <div className="bg-white/[0.03] backdrop-blur-3xl border border-white/10 rounded-[32px] p-6 md:p-12 shadow-2xl">
-
-//                         <div className="flex items-center justify-between mb-8">
-//                             <div>
-//                                 <h2 className="text-2xl font-black tracking-tight">Voice Studio</h2>
-//                                 <p className="text-white/40 text-sm mt-1">Craft your perfect voice</p>
-//                             </div>
-//                             <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#7C3AED] to-[#06B6D4] flex items-center justify-center">
-//                                 <Mic size={18} className="text-white" />
-//                             </div>
-//                         </div>
-
-//                         {/* ── Text Input ─────────────────────────────────────────── */}
-//                         <div className="relative group mb-10">
-//                             <div className="absolute -inset-0.5 bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] rounded-[22px] blur opacity-0 group-focus-within:opacity-30 transition duration-500" />
-//                             <textarea
-//                                 value={text}
-//                                 onChange={e => setText(e.target.value)}
-//                                 placeholder={PLACEHOLDERS[placeholderIdx]}
-//                                 maxLength={5000}
-//                                 className="relative w-full h-44 bg-black/40 border border-white/5 rounded-[20px] p-6 text-white text-lg placeholder:text-white/20 focus:outline-none resize-none transition-all leading-relaxed focus:border-[#7C3AED]/40"
-//                             />
-//                             <div className={`absolute bottom-4 right-5 text-xs font-mono ${text.length > 4800 ? "text-red-400" : "text-white/30"}`}>
-//                                 {text.length} / 5000
-//                             </div>
-//                         </div>
-
-//                         <div className="space-y-10">
-
-//                             {/* ── Language ───────────────────────────────────────────── */}
-//                             <div>
-//                                 <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold block mb-4">
-//                                     Select Language
-//                                 </span>
-//                                 <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-//                                     {LANGUAGES.map(lang => (
-//     <motion.button
-//         key={lang.id}
-//         onClick={() => setActiveLang(lang.id)}
-//         whileHover={{ scale: 1.05 }}
-//         whileTap={{ scale: 0.95 }}
-//         className={`flex flex-col items-center justify-center shrink-0 w-24 h-24 rounded-2xl border transition-all duration-300 ${
-//             activeLang === lang.id
-//                 ? "bg-[#7C3AED]/20 border-[#7C3AED] shadow-lg shadow-[#7C3AED]/20"
-//                 : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10"
-//         }`}
-//     >
-//         <span className="text-3xl mb-1">{lang.flag}</span>
-//         <span className="text-xs font-bold">{lang.name}</span>
-//         <span className="text-[10px] text-[#34C759] font-mono">{lang.accuracy}%</span>
-//     </motion.button>
-// ))}
-//                                 </div>
-//                             </div>
-
-//                             {/* ── Gender + Mood ──────────────────────────────────────── */}
-//                             <div className="flex flex-col md:flex-row gap-8">
-
-//                                 {/* Gender */}
-//                                 <div className="flex-1">
-//                                     <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold block mb-4">
-//                                         Voice Type
-//                                     </span>
-//                                     <div className="bg-black/40 border border-white/5 p-1 rounded-2xl flex relative">
-//                                         <motion.div
-//                                             className="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-gradient-to-br from-[#7C3AED] to-[#06B6D4] rounded-xl shadow-lg"
-//                                             animate={{ left: activeGender === "male" ? "4px" : "50%" }}
-//                                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-//                                         />
-//                                         {["male", "female"].map(g => (
-//                                             <button
-//                                                 key={g}
-//                                                 onClick={() => setActiveGender(g)}
-//                                                 className={`relative z-10 flex-1 py-3 text-sm font-bold transition-colors ${activeGender === g ? "text-white" : "text-white/40"}`}
-//                                             >
-//                                                 {g === "male" ? "♂ Male" : "♀ Female"}
-//                                             </button>
-//                                         ))}
-//                                     </div>
-//                                 </div>
-
-//                                 {/* Mood */}
-//                                 <div className="flex-[2]">
-//                                     <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold block mb-4">
-//                                         Emotion & Tone
-//                                     </span>
-//                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-//                                         {MOODS.map(mood => (
-//                                             <motion.button
-//                                                 key={mood.id}
-//                                                 onClick={() => setActiveMood(mood.id)}
-//                                                 whileHover={{ scale: 1.05 }}
-//                                                 whileTap={{ scale: 0.95 }}
-//                                                 className="flex flex-col p-3 rounded-2xl border transition-all duration-200"
-//                                                 style={{
-//                                                     background:   activeMood === mood.id ? `${mood.hex}15` : "rgba(255,255,255,0.03)",
-//                                                     borderColor:  activeMood === mood.id ? mood.hex : "transparent",
-//                                                     boxShadow:    activeMood === mood.id ? `0 0 20px ${mood.hex}25` : "none",
-//                                                 }}
-//                                             >
-//                                                 <span className="text-2xl mb-1">{mood.emoji}</span>
-//                                                 <span className="text-xs font-bold">{mood.name}</span>
-//                                                 <span className="text-[10px] text-white/40">{mood.desc}</span>
-//                                             </motion.button>
-//                                         ))}
-//                                     </div>
-//                                 </div>
-//                             </div>
-
-//                             {/* ── Error ──────────────────────────────────────────────── */}
-//                             <AnimatePresence>
-//                                 {error && (
-//                                     <motion.div
-//                                         initial={{ opacity: 0, y: -10 }}
-//                                         animate={{ opacity: 1, y: 0 }}
-//                                         exit={{ opacity: 0 }}
-//                                         className="flex items-center gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm"
-//                                     >
-//                                         <X size={16} className="shrink-0" />
-//                                         {error}
-//                                     </motion.div>
-//                                 )}
-//                             </AnimatePresence>
-
-//                             {/* ── Generate Button ────────────────────────────────────── */}
-//                             <motion.button
-//                                 onClick={handleGenerate}
-//                                 disabled={isGenerating || !text.trim()}
-//                                 whileHover={!isGenerating && text.trim() ? { scale: 1.02 } : {}}
-//                                 whileTap={!isGenerating && text.trim() ? { scale: 0.98 } : {}}
-//                                 className={`w-full h-16 rounded-2xl relative overflow-hidden transition-all duration-300 font-bold text-lg ${!text.trim() || isGenerating ? "opacity-50 cursor-not-allowed" : ""}`}
-//                             >
-//                                 <div className="absolute inset-0 bg-gradient-to-r from-[#7C3AED] to-[#06B6D4]" />
-//                                 <div className="relative z-10 flex items-center justify-center gap-3">
-//                                     {isGenerating ? (
-//                                         <span className="flex items-center gap-3">
-//                                             <RefreshCw size={20} className="animate-spin" />
-//                                             Generating your voice…
-//                                         </span>
-//                                     ) : generationSuccess ? (
-//                                         <span className="flex items-center gap-3">
-//                                             <Check size={20} /> Voice Ready!
-//                                         </span>
-//                                     ) : (
-//                                         <span className="flex items-center gap-3">
-//                                             <Mic size={20} /> Generate Speech
-//                                         </span>
-//                                     )}
-//                                 </div>
-//                                 {isGenerating && (
-//                                     <motion.div
-//                                         className="absolute bottom-0 left-0 h-1 bg-white/40"
-//                                         initial={{ width: "0%" }}
-//                                         animate={{ width: "100%" }}
-//                                         transition={{ duration: 8, ease: "linear" }}
-//                                     />
-//                                 )}
-//                             </motion.button>
-
-//                         </div>
-//                     </div>
-//                 </motion.div>
-
-//                 {/* ── History Panel ──────────────────────────────────────────── */}
-//                 <AnimatePresence>
-//                     {showHistory && (
-//                         <motion.div
-//                             initial={{ opacity: 0, y: 20 }}
-//                             animate={{ opacity: 1, y: 0 }}
-//                             exit={{ opacity: 0, y: 20 }}
-//                             className="max-w-3xl mx-auto mt-6 bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-[24px] p-6"
-//                         >
-//                             <div className="flex items-center justify-between mb-6">
-//                                 <h3 className="font-bold text-white/80 uppercase tracking-widest text-xs">Recent Generations</h3>
-//                                 <button onClick={() => setShowHistory(false)} className="text-white/40 hover:text-white"><X size={16} /></button>
-//                             </div>
-//                             {history.length === 0 ? (
-//                                 <p className="text-center text-white/30 py-8 text-sm">No history yet. Generate your first voice!</p>
-//                             ) : (
-//                                 <div className="space-y-3">
-//                                     {history.map(h => (
-//                                         <div key={h.id} className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 hover:bg-white/8 transition-colors">
-//                                             <div className="flex gap-2 shrink-0">
-//                                                 <span className="px-2 py-1 rounded-full bg-[#7C3AED]/20 border border-[#7C3AED]/30 text-[10px] text-[#a78bfa] font-bold uppercase">{h.voice_key}</span>
-//                                                 <span className="px-2 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] text-white/60 font-bold uppercase">{h.mood}</span>
-//                                             </div>
-//                                             <p className="flex-1 text-sm text-white/50 truncate">{h.text}</p>
-//                                             <span className="text-[10px] font-mono text-white/30 shrink-0">{new Date(h.created_at).toLocaleTimeString()}</span>
-//                                             {h.audio_url && (
-//                                                 <a href={h.audio_url} download className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors">
-//                                                     <Download size={14} className="text-white/60" />
-//                                                 </a>
-//                                             )}
-//                                         </div>
-//                                     ))}
-//                                 </div>
-//                             )}
-//                         </motion.div>
-//                     )}
-//                 </AnimatePresence>
-//             </section>
-
-//             {/* ── Emotion Detection Panel ────────────────────────────────────── */}
-//             <section id="emotions" className="relative z-10 px-4 pb-40">
-//                 <motion.div
-//                     initial={{ opacity: 0, y: 60 }}
-//                     whileInView={{ opacity: 1, y: 0 }}
-//                     viewport={{ once: true }}
-//                     transition={{ duration: 0.8 }}
-//                     className="max-w-3xl mx-auto"
-//                 >
-//                     {sessions.length === 0 ? (
-//                         // ── Empty state: shown before any generation ──────────────
-//                         <div className="text-center py-16 px-6 rounded-[32px] border border-white/5 bg-white/[0.02]">
-//                             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-2xl mx-auto mb-4 shadow-lg shadow-violet-500/20">
-//                                 🧠
-//                             </div>
-//                             <h3 className="text-lg font-bold mb-2">Emotion Detection</h3>
-//                             <p className="text-white/40 text-sm max-w-sm mx-auto">
-//                                 Generate a voice above and your session will appear here with AI-powered emotional tone analysis.
-//                             </p>
-//                         </div>
-//                     ) : (
-//                         <EmotionDetectionPanel sessions={sessions} />
-//                     )}
-//                 </motion.div>
-//             </section>
-
-//             {/* ── Floating Audio Player ──────────────────────────────────────── */}
-//             <AnimatePresence>
-//                 {showPlayer && audioURL && (
-//                     <motion.div
-//                         initial={{ y: 120, opacity: 0 }}
-//                         animate={{ y: 0, opacity: 1 }}
-//                         exit={{ y: 120, opacity: 0 }}
-//                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-//                         className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[92%] max-w-2xl z-50"
-//                     >
-//                         <div className="absolute -inset-1 bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] rounded-[28px] blur-xl opacity-20" />
-//                         <div className="relative bg-[#0d0d0f]/90 backdrop-blur-2xl border border-white/15 rounded-3xl p-5 shadow-2xl">
-//                             <div className="flex items-center gap-4">
-
-//                                 {/* Play button */}
-//                                 <motion.button
-//                                     onClick={togglePlay}
-//                                     whileHover={{ scale: 1.1 }}
-//                                     whileTap={{ scale: 0.9 }}
-//                                     className="w-14 h-14 shrink-0 rounded-full bg-gradient-to-br from-[#7C3AED] to-[#06B6D4] flex items-center justify-center shadow-xl shadow-[#7C3AED]/30"
-//                                 >
-//                                     {isPlaying
-//                                         ? <Pause size={20} className="text-white" />
-//                                         : <Play  size={20} className="text-white ml-1" />
-//                                     }
-//                                 </motion.button>
-
-//                                 {/* Progress */}
-//                                 <div className="flex-1 flex flex-col gap-2">
-//                                     <div className="flex justify-between items-center">
-//                                         <div className="flex gap-2">
-//                                             <span className="text-[10px] uppercase tracking-widest text-white/40 font-mono">
-//                                                 {LANGUAGES.find(l => l.id === activeLang)?.name}
-//                                             </span>
-//                                             <span className="text-[10px] uppercase tracking-widest text-white/40 font-mono">·</span>
-//                                             <span className="text-[10px] uppercase tracking-widest text-white/40 font-mono">{activeMood}</span>
-//                                         </div>
-//                                         <span className="text-[10px] font-mono text-white/40">
-//                                             {formatTime(currentTime)} / {formatTime(duration)}
-//                                         </span>
-//                                     </div>
-//                                     <div className="h-1.5 bg-white/10 rounded-full overflow-hidden cursor-pointer">
-//                                         <motion.div
-//                                             className="h-full bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] rounded-full"
-//                                             style={{ width: `${progress}%` }}
-//                                             transition={{ duration: 0.1 }}
-//                                         />
-//                                     </div>
-//                                     <div className="flex items-center gap-0.5 h-4">
-//                                         {[...Array(32)].map((_, i) => (
-//                                             <motion.div
-//                                                 key={i}
-//                                                 className="flex-1 bg-gradient-to-b from-[#7C3AED] to-[#06B6D4] rounded-full opacity-60"
-//                                                 animate={isPlaying
-//                                                     ? { height: [`${Math.random() * 60 + 20}%`, `${Math.random() * 60 + 20}%`] }
-//                                                     : { height: "30%" }
-//                                                 }
-//                                                 transition={{ duration: 0.4, repeat: Infinity, repeatType: "reverse", delay: i * 0.02 }}
-//                                             />
-//                                         ))}
-//                                     </div>
-//                                 </div>
-
-//                                 {/* Actions */}
-//                                 <div className="flex items-center gap-2 shrink-0">
-//                                     <motion.button
-//                                         whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-//                                         onClick={handleDownload}
-//                                         className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
-//                                     >
-//                                         <Download size={16} className="text-white/70" />
-//                                     </motion.button>
-//                                     <motion.button
-//                                         whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-//                                         onClick={() => { setShowPlayer(false); setIsPlaying(false); audioRef.current?.pause(); }}
-//                                         className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
-//                                     >
-//                                         <X size={16} className="text-white/70" />
-//                                     </motion.button>
-//                                 </div>
-
-//                             </div>
-//                         </div>
-//                     </motion.div>
-//                 )}
-//             </AnimatePresence>
-
-//         </div>
-//     );
-// };
-
-// export default SmartTTS;
-
-
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
 import { Mic, Play, Pause, Download, X, Check, Volume2, History, RefreshCw, Brain, Shield, AlertTriangle } from "lucide-react";
+import { EmotionPanel } from "./emotion-detection-panel";
 
-// ─── Config ───────────────────────────────────────────────────────────────────
 const API = "https://kartavya11-smart-tts-api.hf.space";
 const HEADERS = { "Content-Type": "application/json" };
 
@@ -1258,27 +34,17 @@ const PLACEHOLDERS = [
 const CNNLSTMBadge = ({ verification }) => {
     if (!verification) return null;
     const { detected_language, confidence, match, expected, top3 } = verification;
-
     return (
         <motion.div
             initial={{ opacity: 0, y: 12, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className={`rounded-2xl border overflow-hidden ${
-                match
-                    ? "bg-emerald-500/8 border-emerald-500/25"
-                    : "bg-amber-500/8 border-amber-500/25"
-            }`}
+            className={`rounded-2xl border overflow-hidden ${match ? "bg-emerald-500/8 border-emerald-500/25" : "bg-amber-500/8 border-amber-500/25"}`}
         >
-            {/* Header */}
-            <div className={`flex items-center justify-between px-5 py-3 border-b ${
-                match ? "border-emerald-500/15 bg-emerald-500/5" : "border-amber-500/15 bg-amber-500/5"
-            }`}>
+            <div className={`flex items-center justify-between px-5 py-3 border-b ${match ? "border-emerald-500/15 bg-emerald-500/5" : "border-amber-500/15 bg-amber-500/5"}`}>
                 <div className="flex items-center gap-2">
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-                        match ? "bg-emerald-500/20" : "bg-amber-500/20"
-                    }`}>
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${match ? "bg-emerald-500/20" : "bg-amber-500/20"}`}>
                         <Brain size={14} className={match ? "text-emerald-400" : "text-amber-400"} />
                     </div>
                     <div>
@@ -1286,102 +52,53 @@ const CNNLSTMBadge = ({ verification }) => {
                         <p className="text-[9px] text-white/40 leading-none mt-0.5">87.5% trained model · 10,013 audio samples</p>
                     </div>
                 </div>
-                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold ${
-                    match
-                        ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
-                        : "bg-amber-500/15 text-amber-400 border border-amber-500/20"
-                }`}>
-                    {match
-                        ? <><Check size={10} /> Verified</>
-                        : <><AlertTriangle size={10} /> Mismatch</>
-                    }
+                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold ${match ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20" : "bg-amber-500/15 text-amber-400 border border-amber-500/20"}`}>
+                    {match ? <><Check size={10} /> Verified</> : <><AlertTriangle size={10} /> Mismatch</>}
                 </div>
             </div>
-
-            {/* Body */}
             <div className="px-5 py-4 space-y-4">
-
-                {/* Main detection result */}
                 <div>
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Detected</span>
                             <span className="text-sm font-bold text-white">{detected_language}</span>
-                            {match && (
-                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-bold">
-                                    ✓ matches selected
-                                </span>
-                            )}
-                            {!match && (
-                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 font-bold">
-                                    expected {expected}
-                                </span>
-                            )}
+                            {match
+                                ? <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-bold">✓ matches selected</span>
+                                : <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 font-bold">expected {expected}</span>
+                            }
                         </div>
-                        <span className={`text-lg font-black font-mono ${
-                            confidence > 90 ? "text-emerald-400"
-                            : confidence > 70 ? "text-amber-400"
-                            : "text-red-400"
-                        }`}>
+                        <span className={`text-lg font-black font-mono ${confidence > 90 ? "text-emerald-400" : confidence > 70 ? "text-amber-400" : "text-red-400"}`}>
                             {confidence.toFixed(1)}%
                         </span>
                     </div>
-
-                    {/* Confidence bar */}
                     <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                         <motion.div
-                            className={`h-full rounded-full ${
-                                match
-                                    ? "bg-gradient-to-r from-emerald-500 to-emerald-400"
-                                    : "bg-gradient-to-r from-amber-500 to-amber-400"
-                            }`}
-                            initial={{ width: 0 }}
-                            animate={{ width: `${confidence}%` }}
+                            className={`h-full rounded-full ${match ? "bg-gradient-to-r from-emerald-500 to-emerald-400" : "bg-gradient-to-r from-amber-500 to-amber-400"}`}
+                            initial={{ width: 0 }} animate={{ width: `${confidence}%` }}
                             transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
                         />
                     </div>
                 </div>
-
-                {/* Top 3 predictions */}
                 {top3 && (
                     <div>
-                        <span className="text-[9px] uppercase tracking-widest text-white/30 font-bold block mb-2">
-                            Top 3 Predictions
-                        </span>
+                        <span className="text-[9px] uppercase tracking-widest text-white/30 font-bold block mb-2">Top 3 Predictions</span>
                         <div className="grid grid-cols-3 gap-2">
                             {top3.map((item, i) => (
-                                <div key={i} className={`p-2.5 rounded-xl text-center border ${
-                                    i === 0
-                                        ? match
-                                            ? "bg-emerald-500/10 border-emerald-500/20"
-                                            : "bg-amber-500/10 border-amber-500/20"
-                                        : "bg-white/3 border-white/5"
-                                }`}>
-                                    <div className={`text-[9px] font-bold mb-0.5 ${
-                                        i === 0 ? match ? "text-emerald-400" : "text-amber-400" : "text-white/30"
-                                    }`}>
-                                        #{i + 1}
-                                    </div>
+                                <div key={i} className={`p-2.5 rounded-xl text-center border ${i === 0 ? match ? "bg-emerald-500/10 border-emerald-500/20" : "bg-amber-500/10 border-amber-500/20" : "bg-white/3 border-white/5"}`}>
+                                    <div className={`text-[9px] font-bold mb-0.5 ${i === 0 ? match ? "text-emerald-400" : "text-amber-400" : "text-white/30"}`}>#{i + 1}</div>
                                     <div className="text-xs font-bold text-white truncate">{item.language}</div>
-                                    <div className={`text-[10px] font-mono font-bold ${
-                                        i === 0 ? match ? "text-emerald-400" : "text-amber-400" : "text-white/40"
-                                    }`}>
-                                        {item.confidence}%
-                                    </div>
+                                    <div className={`text-[10px] font-mono font-bold ${i === 0 ? match ? "text-emerald-400" : "text-amber-400" : "text-white/40"}`}>{item.confidence}%</div>
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
-
-                {/* What this means */}
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-white/3 border border-white/5">
                     <Shield size={12} className="text-white/30 mt-0.5 shrink-0" />
                     <p className="text-[10px] text-white/40 leading-relaxed">
                         {match
                             ? `CNN-LSTM confirmed the generated audio sounds like ${detected_language} with ${confidence.toFixed(0)}% confidence — validating Edge TTS output quality.`
-                            : `CNN-LSTM detected ${detected_language} instead of ${expected}. This may indicate acoustic overlap between languages.`
-                        }
+                            : `CNN-LSTM detected ${detected_language} instead of ${expected}. This may indicate acoustic overlap between languages.`}
                     </p>
                 </div>
             </div>
@@ -1416,12 +133,17 @@ const SmartTTS = () => {
     const [verification,      setVerification]      = useState(null);
     const [translationInfo,   setTranslationInfo]   = useState(null);
 
+    // ── Emotion panel state ───────────────────────────────────────────────────
+    // emotionKey changes every generation → forces EmotionPanel to re-mount & re-analyse
+    const [emotionKey,        setEmotionKey]        = useState(null);
+    const [emotionTranscript, setEmotionTranscript] = useState(null);
+    const [emotionLanguage,   setEmotionLanguage]   = useState(null);
+
     const audioRef    = useRef(null);
     const { scrollY } = useScroll();
     const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]);
     const heroY       = useTransform(scrollY, [0, 400], [0, 100]);
 
-    // ── Effects ───────────────────────────────────────────────────────────────
     useEffect(() => {
         const h = () => setIsScrolled(window.scrollY > 20);
         window.addEventListener("scroll", h);
@@ -1459,7 +181,6 @@ const SmartTTS = () => {
         };
     }, [audioURL]);
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
     const formatTime = s => {
         if (!s || isNaN(s)) return "0:00";
         return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
@@ -1496,6 +217,10 @@ const SmartTTS = () => {
         setShowPlayer(false);
         setVerification(null);
         setTranslationInfo(null);
+        // Reset emotion panel before new generation
+        setEmotionKey(null);
+        setEmotionTranscript(null);
+        setEmotionLanguage(null);
 
         try {
             const res = await fetch(`${API}/generate`, {
@@ -1513,7 +238,6 @@ const SmartTTS = () => {
 
             setAudioURL(`${API}${data.audio_url}`);
 
-            // ── Translation info
             if (data.translated) {
                 setTranslationInfo({
                     original:   data.original_text,
@@ -1522,10 +246,17 @@ const SmartTTS = () => {
                 });
             }
 
-            // ── CNN-LSTM verification result — comes from backend automatically
             if (data.verification) {
                 setVerification(data.verification);
             }
+
+            // ── Set emotion panel to analyse the TRANSLATED text in selected language
+            // This shows emotion of the actual spoken content, not the English input
+            const transcriptForEmotion = data.translated_text || data.original_text || text;
+            const langName = LANGUAGES.find(l => l.id === activeLang)?.name || activeLang;
+            setEmotionTranscript(transcriptForEmotion);
+            setEmotionLanguage(langName);
+            setEmotionKey(`emotion-${Date.now()}`); // unique key = re-mount = re-analyse
 
             setIsGenerating(false);
             setGenerationSuccess(true);
@@ -1542,7 +273,6 @@ const SmartTTS = () => {
         }
     };
 
-    // ── Render ────────────────────────────────────────────────────────────────
     return (
         <div className="min-h-screen w-full overflow-hidden bg-[#080808] text-white font-sans selection:bg-[#7C3AED]/30">
             <audio ref={audioRef} src={audioURL || ""} />
@@ -1611,7 +341,7 @@ const SmartTTS = () => {
             </motion.section>
 
             {/* Interface */}
-            <section id="interface" className="relative z-10 px-4 pb-20">
+            <section id="interface" className="relative z-10 px-4 pb-40">
                 <motion.div initial={{ opacity: 0, y: 60 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-3xl mx-auto">
                     <div className="h-px w-full bg-gradient-to-r from-transparent via-[#7C3AED] to-transparent mb-0 rounded-t-[32px]" />
                     <div className="bg-white/[0.03] backdrop-blur-3xl border border-white/10 rounded-[32px] p-6 md:p-12 shadow-2xl">
@@ -1657,8 +387,7 @@ const SmartTTS = () => {
                                                 activeLang === lang.id
                                                     ? "bg-[#7C3AED]/20 border-[#7C3AED] shadow-lg shadow-[#7C3AED]/20"
                                                     : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10"
-                                            }`}
-                                        >
+                                            }`}>
                                             <span className="text-3xl mb-1">{lang.flag}</span>
                                             <span className="text-xs font-bold">{lang.name}</span>
                                             <span className="text-[10px] text-[#34C759] font-mono font-bold">{lang.accuracy}%</span>
@@ -1750,9 +479,31 @@ const SmartTTS = () => {
                                 )}
                             </motion.button>
 
-                            {/* ── CNN-LSTM Verification Badge ─────────────────────── */}
+                            {/* CNN-LSTM Verification Badge */}
                             <AnimatePresence>
                                 {verification && <CNNLSTMBadge verification={verification} />}
+                            </AnimatePresence>
+
+                            {/* ── Emotion Analysis Panel ────────────────────────────
+                                Appears after every generation below the CNN-LSTM badge.
+                                Analyses the TRANSLATED text in the selected language.
+                                key={emotionKey} forces re-mount on each new generation.
+                            ─────────────────────────────────────────────────────── */}
+                            <AnimatePresence>
+                                {emotionKey && emotionTranscript && (
+                                    <motion.div
+                                        key={emotionKey}
+                                        initial={{ opacity: 0, y: 16 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{ duration: 0.5, ease: "easeOut", delay: 0.2 }}
+                                    >
+                                        <EmotionPanel
+                                            transcript={emotionTranscript}
+                                            language={emotionLanguage}
+                                        />
+                                    </motion.div>
+                                )}
                             </AnimatePresence>
 
                         </div>
@@ -1809,7 +560,6 @@ const SmartTTS = () => {
                                             </span>
                                             <span className="text-[10px] text-white/40 font-mono">·</span>
                                             <span className="text-[10px] uppercase tracking-widest text-white/40 font-mono">{activeMood}</span>
-                                            {/* Mini CNN-LSTM badge in player */}
                                             {verification && (
                                                 <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
                                                     verification.match
