@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
 import { Mic, Play, Pause, Download, X, Check, Volume2, History, RefreshCw, Brain, Shield, AlertTriangle } from "lucide-react";
-import { EmotionPanel } from "./emotion-detection-panel";
+import { EmotionPanel } from "../ui/emotion-detection-panel";
 
 const API = "https://kartavya11-smart-tts-api.hf.space";
 const HEADERS = { "Content-Type": "application/json" };
