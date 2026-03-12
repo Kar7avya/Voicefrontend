@@ -7,15 +7,12 @@ const API = "https://kartavya11-smart-tts-api.hf.space";
 const HEADERS = { "Content-Type": "application/json" };
 
 const LANGUAGES = [
-    { id: "hindi",     flag: "🇮🇳", name: "Hindi",     script: "हिंदी",      code: "hi", accuracy: 97 },
-    { id: "english",   flag: "🌍",  name: "English",   script: "English",    code: "en", accuracy: 99 },
-    { id: "bengali",   flag: "🎨",  name: "Bengali",   script: "বাংলা",     code: "bn", accuracy: 99 },
-    { id: "tamil",     flag: "🏛️",  name: "Tamil",     script: "தமிழ்",    code: "ta", accuracy: 97 },
-    { id: "telugu",    flag: "🌅",  name: "Telugu",    script: "తెలుగు",   code: "te", accuracy: 93 },
-    { id: "malayalam", flag: "🌴",  name: "Malayalam", script: "മലയാളം",  code: "ml", accuracy: 99 },
-    { id: "kannada",   flag: "🌻",  name: "Kannada",   script: "ಕನ್ನಡ",   code: "kn", accuracy: 97 },
-    { id: "gujarati",  flag: "🦁",  name: "Gujarati",  script: "ગુજરાતી", code: "gu", accuracy: 99 },
-    { id: "punjabi",   flag: "🌾",  name: "Punjabi",   script: "ਪੰਜਾਬੀ",  code: "pa", accuracy: 98 },
+    { id: "hindi",     flag: "🇮🇳", name: "Hindi",     script: "हिंदी",     code: "hi", accuracy: 97 },
+    { id: "english",   flag: "🌍",  name: "English",   script: "English",   code: "en", accuracy: 99 },
+    { id: "bengali",   flag: "🎨",  name: "Bengali",   script: "বাংলা",    code: "bn", accuracy: 99 },
+    { id: "tamil",     flag: "🏛️",  name: "Tamil",     script: "தமிழ்",   code: "ta", accuracy: 97 },
+    { id: "telugu",    flag: "🌅",  name: "Telugu",    script: "తెలుగు",  code: "te", accuracy: 93 },
+    { id: "malayalam", flag: "🌴",  name: "Malayalam", script: "മലയാളം", code: "ml", accuracy: 99 },
 ];
 
 const MOODS = [
