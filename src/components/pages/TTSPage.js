@@ -271,7 +271,7 @@ const SmartTTS = () => {
     };
 
     return (
-        <div className="min-h-screen w-full overflow-hidden bg-[#080808] text-white font-sans selection:bg-[#7C3AED]/30">
+        <div className="min-h-screen w-full overflow-hidden bg-[#FAF7F2] text-[#1a1a1a] font-sans selection:bg-[#7C3AED]/30">
             <audio ref={audioRef} src={audioURL || ""} />
 
             {/* Background */}
