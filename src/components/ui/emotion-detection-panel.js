@@ -1,7 +1,7 @@
 "use client"
 
 import React, {
-  createContext, useCallback, useContext,
+  createContext, useCallback,
   useEffect, useRef, useState,
 } from "react";
 
@@ -36,11 +36,6 @@ function CounterProvider({ children }) {
   const ref = useRef(0);
   const getNextIndex = useCallback(() => ref.current++, []);
   return <CounterContext.Provider value={{ getNextIndex }}>{children}</CounterContext.Provider>;
-}
-function useCounter() {
-  const ctx = useContext(CounterContext);
-  if (!ctx) throw new Error("useCounter must be inside CounterProvider");
-  return ctx.getNextIndex;
 }
 
 // ─── Groq API helper ───────────────────────────────────────────────────────────
@@ -581,11 +576,7 @@ export function EmotionPanel({ transcript, language, className = "" }) {
 
 // ─── EmotionDetectionPanel — multi-session version (kept for compatibility) ───
 export function EmotionDetectionPanel({ sessions = [], className = "" }) {
-  const [results,   setResults]   = useState({});
-  const [phrases,   setPhrases]   = useState({});
-  const [analysing, setAnalysing] = useState({});
-  const [breaking,  setBreaking]  = useState({});
-  const [errors,    setErrors]    = useState({});
+  const [results, setResults] = useState({});
   const analysedRef = useRef(new Set());
 
   const analysedCount = Object.keys(results).length;
@@ -608,27 +599,12 @@ export function EmotionDetectionPanel({ sessions = [], className = "" }) {
   }, [sessions]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function runAnalysis(session) {
-    setAnalysing((prev) => ({ ...prev, [session.id]: true  }));
-    setErrors   ((prev) => ({ ...prev, [session.id]: null  }));
-
     try {
       const result = await detectEmotion(session.transcript);
       setResults((prev) => ({ ...prev, [session.id]: result }));
-    } catch (e) {
-      setErrors   ((prev) => ({ ...prev, [session.id]: `API error: ${e.message}` }));
-      setAnalysing((prev) => ({ ...prev, [session.id]: false }));
-      return;
-    }
-    setAnalysing((prev) => ({ ...prev, [session.id]: false }));
-
-    setBreaking((prev) => ({ ...prev, [session.id]: true }));
-    try {
-      const result = await detectPhraseEmotions(session.transcript);
-      setPhrases((prev) => ({ ...prev, [session.id]: result }));
     } catch {
-      // fails silently
+      // fails silently — EmotionPanel handles its own errors
     }
-    setBreaking((prev) => ({ ...prev, [session.id]: false }));
   }
 
   return (
