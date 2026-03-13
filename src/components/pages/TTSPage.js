@@ -438,8 +438,8 @@ const SmartTTS = () => {
                                         <p className="text-[10px] uppercase tracking-widest text-[#a78bfa] font-bold mb-2">
                                             🌐 Translated to {translationInfo.language}
                                         </p>
-                                        <p className="text-white/40 text-xs line-through mb-1">{translationInfo.original}</p>
-                                        <p className="text-white text-sm font-medium">{translationInfo.translated}</p>
+                                        <p className="text-xs line-through mb-1" style={{ color: "#9ca3af" }}>{translationInfo.original}</p>
+<p className="text-sm font-medium" style={{ color: "#111827" }}>{translationInfo.translated}</p>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
