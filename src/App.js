@@ -12,34 +12,29 @@ import Login from './components/pages/Login';
 import Dashboard from './components/pages/Dashboard';
 import AuthCallback from './components/pages/AuthCallback';
 import supabase from './components/pages/supabaseClient';
-// import VoiceStudio from './components/pages/VoiceStudio';
 import Teleprompter from './components/pages/Teleprompter';
-// import VoiceForge from './components/pages/VoiceForge';
 import TTSPage from "./components/pages/TTSPage";
+import SpeakWell from "./components/pages/SpeakWell";   // ← ADD THIS
 
-// Protected Route Component
+// ── Protected Route ───────────────────────────────────────────────
 const ProtectedRoute = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(null); // null = loading
+  const [isAuthenticated, setIsAuthenticated] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Get current session from Supabase
         const { data: { session }, error } = await supabase.auth.getSession();
-
         if (error) {
           console.error('Auth check error:', error);
           setIsAuthenticated(false);
         } else {
           setIsAuthenticated(!!session);
-
-          // Store/update tokens if session exists
           if (session) {
-            localStorage.setItem('access_token', session.access_token);
+            localStorage.setItem('access_token',  session.access_token);
             localStorage.setItem('refresh_token', session.refresh_token);
-            localStorage.setItem('user_id', session.user.id);
-            localStorage.setItem('user_email', session.user.email);
+            localStorage.setItem('user_id',       session.user.id);
+            localStorage.setItem('user_email',    session.user.email);
           }
         }
       } catch (error) {
@@ -52,20 +47,17 @@ const ProtectedRoute = ({ children }) => {
 
     checkAuth();
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session);
-
         if (event === 'SIGNED_IN' && session) {
           setIsAuthenticated(true);
-          localStorage.setItem('access_token', session.access_token);
+          localStorage.setItem('access_token',  session.access_token);
           localStorage.setItem('refresh_token', session.refresh_token);
-          localStorage.setItem('user_id', session.user.id);
-          localStorage.setItem('user_email', session.user.email);
+          localStorage.setItem('user_id',       session.user.id);
+          localStorage.setItem('user_email',    session.user.email);
         } else if (event === 'SIGNED_OUT') {
           setIsAuthenticated(false);
-          // Clear all auth data
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
           localStorage.removeItem('user_id');
@@ -74,38 +66,25 @@ const ProtectedRoute = ({ children }) => {
       }
     );
 
-    // Cleanup subscription
     return () => subscription.unsubscribe();
   }, []);
 
-  // Show loading while checking authentication
   if (loading) {
     return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        flexDirection: 'column'
-      }}>
+      <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', flexDirection:'column' }}>
         <div className="spinner-border text-primary" role="status">
           <span className="visually-hidden">Loading...</span>
         </div>
-        <p style={{ marginTop: '1rem' }}>Checking authentication...</p>
+        <p style={{ marginTop:'1rem' }}>Checking authentication...</p>
       </div>
     );
   }
 
-  // Redirect to login if not authenticated
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // Return protected content if authenticated
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
   return children;
 };
 
-// Public Route Component (redirects authenticated users)
+// ── Public Route ──────────────────────────────────────────────────
 const PublicRoute = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -122,18 +101,12 @@ const PublicRoute = ({ children }) => {
         setLoading(false);
       }
     };
-
     checkAuth();
   }, []);
 
   if (loading) {
     return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh'
-      }}>
+      <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh' }}>
         <div className="spinner-border text-primary" role="status">
           <span className="visually-hidden">Loading...</span>
         </div>
@@ -141,15 +114,11 @@ const PublicRoute = ({ children }) => {
     );
   }
 
-  // If user is already authenticated, redirect to home
-  if (isAuthenticated) {
-    return <Navigate to="/home" replace />;
-  }
-
-  // Show public content if not authenticated
+  if (isAuthenticated) return <Navigate to="/home" replace />;
   return children;
 };
 
+// ── App ───────────────────────────────────────────────────────────
 function App() {
   return (
     <Router>
@@ -167,7 +136,7 @@ function App() {
       />
 
       <Routes>
-        {/* Root redirect - smart routing based on auth state */}
+        {/* Root redirect */}
         <Route
           path="/"
           element={
@@ -177,32 +146,14 @@ function App() {
           }
         />
 
-        {/* Public authentication routes */}
-        <Route
-          path="/login"
-          element={
-            <PublicRoute>
-              <Login />
-            </PublicRoute>
-          }
-        />
+        {/* Public auth routes */}
+        <Route path="/login"  element={<PublicRoute><Login  /></PublicRoute>} />
+        <Route path="/signup" element={<PublicRoute><SignUp /></PublicRoute>} />
 
-        <Route
-          path="/signup"
-          element={
-            <PublicRoute>
-              <SignUp />
-            </PublicRoute>
-          }
-        />
-
-        {/* VoiceForge demo (public, standalone) */}
-        {/* <Route path="/voiceforge" element={<VoiceForge />} /> */}
-
-        {/* Email verification callback route */}
+        {/* Email verification callback */}
         <Route path="/auth/callback" element={<AuthCallback />} />
 
-        {/* Protected routes wrapped in Layout */}
+        {/* Protected routes inside Layout */}
         <Route
           path="/"
           element={
@@ -211,15 +162,15 @@ function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="home" element={<Home />} />
-          <Route path="upload" element={<Upload />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          {/* <Route path="voicestudio" element={<VoiceStudio />} /> */}
+          <Route path="home"         element={<Home />} />
+          <Route path="upload"       element={<Upload />} />
+          <Route path="dashboard"    element={<Dashboard />} />
           <Route path="teleprompter" element={<Teleprompter />} />
-          <Route path="tts" element={<TTSPage />} />
+          <Route path="tts"          element={<TTSPage />} />
+          <Route path="speakwell"    element={<SpeakWell />} />  {/* ← ADD THIS */}
         </Route>
 
-        {/* Catch-all: redirect unknown paths based on auth state */}
+        {/* Catch-all */}
         <Route
           path="*"
           element={
