@@ -581,7 +581,7 @@ export default function SpeakWell() {
             <div style={{ display:"grid",
               gridTemplateColumns:"1fr 270px", gap:14, alignItems:"start" }}>
 
-              {/* Camera + canvas overlay */}
+              {/* Camera +canvas overlay */}
               <div style={{ borderRadius:T.radius, overflow:"hidden",
                 background:"#000", border:`2px solid ${borderCol}`,
                 transition:"border-color .3s", position:"relative" }}>
