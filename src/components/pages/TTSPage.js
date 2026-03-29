@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
 import { Mic, Play, Pause, Download, X, Check, Volume2, History, RefreshCw, Brain, Shield, AlertTriangle } from "lucide-react";
 import { EmotionPanel } from "../ui/emotion-detection-panel";
+import AudioVisualizer from "../ui/Audiovisualizer";
 
 const API = "https://kartavya11-smart-tts-api.hf.space";
 const HEADERS = { "Content-Type": "application/json" };
@@ -130,8 +131,10 @@ const SmartTTS = () => {
     const [verification,      setVerification]      = useState(null);
     const [translationInfo,   setTranslationInfo]   = useState(null);
 
+    // ── Audio features from CNN-LSTM (for visualizer) ─────────────────────────
+    const [audioFeatures,     setAudioFeatures]     = useState(null);
+
     // ── Emotion panel state ───────────────────────────────────────────────────
-    // emotionKey changes every generation → forces EmotionPanel to re-mount & re-analyse
     const [emotionKey,        setEmotionKey]        = useState(null);
     const [emotionTranscript, setEmotionTranscript] = useState(null);
     const [emotionLanguage,   setEmotionLanguage]   = useState(null);
@@ -214,7 +217,7 @@ const SmartTTS = () => {
         setShowPlayer(false);
         setVerification(null);
         setTranslationInfo(null);
-        // Reset emotion panel before new generation
+        setAudioFeatures(null);
         setEmotionKey(null);
         setEmotionTranscript(null);
         setEmotionLanguage(null);
@@ -247,13 +250,17 @@ const SmartTTS = () => {
                 setVerification(data.verification);
             }
 
-            // ── Set emotion panel to analyse the TRANSLATED text in selected language
-            // This shows emotion of the actual spoken content, not the English input
+            // ── CNN-LSTM extracted features → AudioVisualizer
+            if (data.audio_features) {
+                setAudioFeatures(data.audio_features);
+            }
+
+            // ── Emotion panel — analyses translated text
             const transcriptForEmotion = data.translated_text || data.original_text || text;
             const langName = LANGUAGES.find(l => l.id === activeLang)?.name || activeLang;
             setEmotionTranscript(transcriptForEmotion);
             setEmotionLanguage(langName);
-            setEmotionKey(`emotion-${Date.now()}`); // unique key = re-mount = re-analyse
+            setEmotionKey(`emotion-${Date.now()}`);
 
             setIsGenerating(false);
             setGenerationSuccess(true);
@@ -318,7 +325,7 @@ const SmartTTS = () => {
                         <span className="block bg-clip-text text-transparent bg-gradient-to-r from-[#7C3AED] to-[#06B6D4]">EVERY VOICE</span>
                     </h1>
                     <p className="mt-8 text-xl md:text-2xl text-white/40 font-light max-w-2xl mx-auto">
-                        The Voice of Intelligent India. Premium, emotional, human-like text-to-speech in 9 Indian languages.
+                        The Voice of Intelligent India. Premium, emotional, human-like text-to-speech in 6 Indian languages.
                     </p>
                     <motion.a href="#interface" className="inline-flex items-center gap-2 mt-10 px-8 py-4 rounded-full bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] text-white font-bold text-lg shadow-2xl shadow-[#7C3AED]/30 hover:scale-105 active:scale-95 transition-all" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                         <Mic size={20} /> Start Speaking
@@ -439,7 +446,7 @@ const SmartTTS = () => {
                                             🌐 Translated to {translationInfo.language}
                                         </p>
                                         <p className="text-xs line-through mb-1" style={{ color: "#9ca3af" }}>{translationInfo.original}</p>
-<p className="text-sm font-medium" style={{ color: "#111827" }}>{translationInfo.translated}</p>
+                                        <p className="text-sm font-medium" style={{ color: "#111827" }}>{translationInfo.translated}</p>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
@@ -460,7 +467,7 @@ const SmartTTS = () => {
                                 whileTap={!isGenerating && text.trim() ? { scale: 0.98 } : {}}
                                 className={`w-full h-16 rounded-2xl relative overflow-hidden transition-all duration-300 font-bold text-lg ${!text.trim() || isGenerating ? "opacity-50 cursor-not-allowed" : ""}`}>
                                 <div className="absolute inset-0 bg-gradient-to-r from-[#7C3AED] to-[#06B6D4]" />
-                                <div className="relative z-10 flex items-center justify-center gap-3">
+                                <div className="relative z-10 flex items-center justify-center gap-3 text-white">
                                     {isGenerating ? (
                                         <span className="flex items-center gap-3"><RefreshCw size={20} className="animate-spin" /> Generating your voice…</span>
                                     ) : generationSuccess ? (
@@ -476,16 +483,30 @@ const SmartTTS = () => {
                                 )}
                             </motion.button>
 
-                            {/* CNN-LSTM Verification Badge */}
+                            {/* ── CNN-LSTM Verification Badge ── */}
                             <AnimatePresence>
                                 {verification && <CNNLSTMBadge verification={verification} />}
                             </AnimatePresence>
 
-                            {/* ── Emotion Analysis Panel ────────────────────────────
-                                Appears after every generation below the CNN-LSTM badge.
-                                Analyses the TRANSLATED text in the selected language.
-                                key={emotionKey} forces re-mount on each new generation.
-                            ─────────────────────────────────────────────────────── */}
+                            {/* ── Audio Visualizer — MFCC features from CNN-LSTM ── */}
+                            <AnimatePresence>
+                                {audioFeatures && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 16 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
+                                    >
+                                        <AudioVisualizer
+                                            audioFeatures={audioFeatures}
+                                            isPlaying={isPlaying}
+                                            language={LANGUAGES.find(l => l.id === activeLang)?.name}
+                                        />
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            {/* ── Emotion Analysis Panel ── */}
                             <AnimatePresence>
                                 {emotionKey && emotionTranscript && (
                                     <motion.div
@@ -573,12 +594,21 @@ const SmartTTS = () => {
                                         <motion.div className="h-full bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] rounded-full"
                                             style={{ width: `${progress}%` }} transition={{ duration: 0.1 }} />
                                     </div>
+                                    {/* Mini MFCC bars in player — uses real features if available, fallback to animation */}
                                     <div className="flex items-center gap-0.5 h-4">
-                                        {[...Array(32)].map((_, i) => (
-                                            <motion.div key={i} className="flex-1 bg-gradient-to-b from-[#7C3AED] to-[#06B6D4] rounded-full opacity-60"
-                                                animate={isPlaying ? { height: [`${Math.random() * 60 + 20}%`, `${Math.random() * 60 + 20}%`] } : { height: "30%" }}
-                                                transition={{ duration: 0.4, repeat: Infinity, repeatType: "reverse", delay: i * 0.02 }} />
-                                        ))}
+                                        {(audioFeatures?.mfcc ?? [...Array(32)].map(() => Math.random())).slice(0, 32).map((val, i) => {
+                                            const h = audioFeatures
+                                                ? `${20 + Math.abs(val) / Math.max(...audioFeatures.mfcc.map(Math.abs)) * 80}%`
+                                                : "30%";
+                                            return (
+                                                <motion.div key={i}
+                                                    className="flex-1 rounded-full opacity-70"
+                                                    style={{ background: "linear-gradient(to bottom, #7C3AED, #06B6D4)" }}
+                                                    animate={isPlaying ? { height: [h, `${parseInt(h) * (0.8 + (i % 3) * 0.15)}%`, h] } : { height: h }}
+                                                    transition={{ duration: 0.35 + (i % 5) * 0.08, repeat: Infinity, repeatType: "reverse", delay: i * 0.02 }}
+                                                />
+                                            );
+                                        })}
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
