@@ -281,7 +281,9 @@ export default function SpeakWell() {
   const timerRef    = useRef(null);
   const scoresRef   = useRef([]);
   const gestureLogRef = useRef([]);
-  const snapshotTimerRef = useRef(null);
+  // const snapshotTimerRef = useRef(null);
+  // eslint-disable-next-line no-unused-vars
+const snapshotTimerRef = useRef(null);
   const frameCountRef  = useRef(0);
   const lastResultRef  = useRef(null);
 
