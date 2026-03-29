@@ -3,15 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 const ML_URL      = process.env.REACT_APP_ML_URL      || "";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
 
-const T = {
-  bg:"#f5f5f7", surface:"#ffffff", border:"rgba(0,0,0,0.08)",
-  text:"#1d1d1f", muted:"#6e6e73", hint:"#aeaeb2",
-  green:"#34c759", yellow:"#ff9f0a", red:"#ff3b30", blue:"#0071e3",
-  radius:"14px", radiusSm:"10px",
-  font:"-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif",
-};
-
-// ── Hand connections ──────────────────────────────────────────────
+// ── Skeleton drawing ──────────────────────────────────────────────
 const HAND_CONN = [
   [0,1],[1,2],[2,3],[3,4],
   [0,5],[5,6],[6,7],[7,8],
@@ -20,390 +12,345 @@ const HAND_CONN = [
   [0,17],[17,18],[18,19],[19,20],
   [5,9],[9,13],[13,17],
 ];
-
 const POSE_CONN = [
   [11,12],[11,13],[13,15],[12,14],[14,16],
   [11,23],[12,24],[23,24],
   [23,25],[25,27],[24,26],[26,28],
 ];
+const Q_COLOR = { good:"#30d158", bad:"#ff453a", warning:"#ffd60a", ok:"rgba(255,255,255,0.5)" };
 
-const QUALITY_COLOR = {
-  good:    "#34c759",
-  bad:     "#ff3b30",
-  warning: "#ff9f0a",
-  ok:      "rgba(200,200,200,0.8)",
-};
-
-// ── Draw skeleton on canvas ───────────────────────────────────────
 function drawSkeleton(canvas, landmarks, analysis) {
   if (!canvas || !landmarks) return;
   const ctx = canvas.getContext("2d");
-  const W   = canvas.width;
-  const H   = canvas.height;
+  const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
-
   const { hands = [], pose = [] } = landmarks;
 
-  // Pose lines — thin white
-  if (pose.length > 0) {
-    ctx.strokeStyle = "rgba(230,230,230,0.85)";
-    ctx.lineWidth   = 2;
-    ctx.lineCap     = "round";
-    POSE_CONN.forEach(([a, b]) => {
-      if (pose[a]?.v > 0.5 && pose[b]?.v > 0.5) {
+  // Pose
+  if (pose.length) {
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 2; ctx.lineCap = "round";
+    POSE_CONN.forEach(([a,b]) => {
+      if (pose[a]?.v > 0.4 && pose[b]?.v > 0.4) {
         ctx.beginPath();
-        ctx.moveTo(pose[a].x * W, pose[a].y * H);
-        ctx.lineTo(pose[b].x * W, pose[b].y * H);
+        ctx.moveTo(pose[a].x*W, pose[a].y*H);
+        ctx.lineTo(pose[b].x*W, pose[b].y*H);
         ctx.stroke();
       }
     });
-    // Key joint dots
     [11,12,13,14,15,16,23,24,25,26,27,28].forEach(i => {
-      if (pose[i]?.v > 0.5) {
-        const x = pose[i].x * W, y = pose[i].y * H;
+      if (pose[i]?.v > 0.4) {
         ctx.beginPath();
-        ctx.arc(x, y, 5, 0, Math.PI * 2);
-        ctx.fillStyle   = "#ffffff";
-        ctx.fill();
-        ctx.strokeStyle = "rgba(160,160,160,0.6)";
-        ctx.lineWidth   = 1;
-        ctx.stroke();
+        ctx.arc(pose[i].x*W, pose[i].y*H, 4, 0, Math.PI*2);
+        ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fill();
       }
     });
   }
 
-  // Hand skeleton — colored by gesture quality
-  hands.forEach((handLms, hi) => {
-    const q   = analysis?.gestures?.find(g => g.hand === hi)?.quality || "ok";
-    const col = QUALITY_COLOR[q] || QUALITY_COLOR.ok;
-
-    // Lines
-    ctx.strokeStyle = col;
-    ctx.lineWidth   = 2.5;
-    ctx.lineCap     = "round";
-    HAND_CONN.forEach(([a, b]) => {
+  // Hands
+  hands.forEach((lms, hi) => {
+    const q = analysis?.gestures?.find(g=>g.hand===hi)?.quality || "ok";
+    const col = Q_COLOR[q];
+    ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.lineCap = "round";
+    HAND_CONN.forEach(([a,b]) => {
       ctx.beginPath();
-      ctx.moveTo(handLms[a].x * W, handLms[a].y * H);
-      ctx.lineTo(handLms[b].x * W, handLms[b].y * H);
+      ctx.moveTo(lms[a].x*W, lms[a].y*H);
+      ctx.lineTo(lms[b].x*W, lms[b].y*H);
       ctx.stroke();
     });
-
-    // Dots
-    handLms.forEach((lm, i) => {
-      const x = lm.x * W, y = lm.y * H;
-      const r = i === 0 ? 6 : 4;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fillStyle = col;
-      ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.9)";
-      ctx.lineWidth   = 1.5;
-      ctx.stroke();
+    lms.forEach((lm, i) => {
+      const r = i===0 ? 6 : 4;
+      ctx.beginPath(); ctx.arc(lm.x*W, lm.y*H, r, 0, Math.PI*2);
+      ctx.fillStyle = col; ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 1.5; ctx.stroke();
     });
   });
-
-  // Tiny score dot bottom-left
-  if (analysis) {
-    const sc  = analysis.score;
-    const col = sc >= 75 ? T.green : sc >= 50 ? T.yellow : T.red;
-    ctx.beginPath();
-    ctx.arc(16, H - 18, 6, 0, Math.PI * 2);
-    ctx.fillStyle = col;
-    ctx.fill();
-    ctx.font      = `600 13px ${T.font}`;
-    ctx.fillStyle = col;
-    ctx.fillText(sc, 28, H - 13);
-  }
 }
 
-// ── Reusable UI ───────────────────────────────────────────────────
-const Card = ({ children, style }) => (
-  <div style={{ background:T.surface, borderRadius:T.radius,
-    border:`1px solid ${T.border}`, padding:"20px", ...style }}>
-    {children}
-  </div>
-);
-
-const Label = ({ children }) => (
-  <p style={{ fontSize:11, fontWeight:600, color:T.muted, letterSpacing:".06em",
-    textTransform:"uppercase", marginBottom:8 }}>{children}</p>
-);
-
-const StatusPill = ({ color, label }) => {
-  const map = {
-    green:  { bg:"rgba(52,199,89,.12)",  border:"rgba(52,199,89,.3)",  text:"#1a7a34" },
-    yellow: { bg:"rgba(255,159,10,.12)", border:"rgba(255,159,10,.3)", text:"#7a4a00" },
-    red:    { bg:"rgba(255,59,48,.12)",  border:"rgba(255,59,48,.3)",  text:"#a80000" },
-    neutral:{ bg:"rgba(0,0,0,.05)",      border:"rgba(0,0,0,.1)",      text:T.muted   },
-  };
-  const c = map[color] || map.neutral;
+// ── Score ring ────────────────────────────────────────────────────
+function ScoreRing({ score, size=120 }) {
+  const r = size*0.38, circ = 2*Math.PI*r;
+  const col = score>=75?"#30d158":score>=50?"#ffd60a":score>0?"#ff453a":"rgba(255,255,255,0.2)";
+  const lbl = score>=75?"Excellent":score>=50?"Good":score>0?"Improve":"—";
   return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:5,
-      padding:"4px 11px", borderRadius:20,
-      background:c.bg, border:`1px solid ${c.border}`,
-      fontSize:12, fontWeight:600, color:c.text, whiteSpace:"nowrap" }}>
-      <span style={{ width:6, height:6, borderRadius:"50%",
-        background: color==="green"?T.green:color==="yellow"?T.yellow:color==="red"?T.red:T.hint }} />
-      {label}
-    </span>
-  );
-};
-
-function ScoreArc({ score }) {
-  const r = 44, circ = 2 * Math.PI * r;
-  const col = score>=75?T.green:score>=50?T.yellow:score>0?T.red:T.hint;
-  const lbl = score>=75?"Excellent":score>=50?"Good":score>0?"Improve":"Waiting";
-  return (
-    <div style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
-      <svg width="108" height="108" viewBox="0 0 108 108">
-        <circle cx="54" cy="54" r={r} fill="none" stroke={T.border} strokeWidth="7"/>
-        <circle cx="54" cy="54" r={r} fill="none" stroke={col} strokeWidth="7"
-          strokeLinecap="round"
-          strokeDasharray={`${(score/100)*circ} ${circ}`}
-          strokeDashoffset={circ/4}
-          style={{ transition:"stroke-dasharray .45s cubic-bezier(.4,0,.2,1),stroke .3s" }}/>
-        <text x="54" y="48" textAnchor="middle" fontSize="24" fontWeight="600"
-          fill={col} fontFamily={T.font}>{score>0?score:"—"}</text>
-        <text x="54" y="64" textAnchor="middle" fontSize="10" fill={T.muted}
-          fontFamily={T.font}>{lbl}</text>
-      </svg>
-    </div>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none"
+        stroke="rgba(255,255,255,0.1)" strokeWidth="6"/>
+      <circle cx={size/2} cy={size/2} r={r} fill="none"
+        stroke={col} strokeWidth="6" strokeLinecap="round"
+        strokeDasharray={`${(score/100)*circ} ${circ}`}
+        strokeDashoffset={circ/4}
+        style={{transition:"stroke-dasharray .5s ease,stroke .3s"}}/>
+      <text x={size/2} y={size/2-6} textAnchor="middle"
+        fontSize={size*0.22} fontWeight="700" fill={col}
+        fontFamily="-apple-system,sans-serif">{score>0?score:"—"}</text>
+      <text x={size/2} y={size/2+14} textAnchor="middle"
+        fontSize={size*0.1} fill="rgba(255,255,255,0.5)"
+        fontFamily="-apple-system,sans-serif">{lbl}</text>
+    </svg>
   );
 }
 
-function MiniTimeline({ scores }) {
-  const last = scores.slice(-70);
-  if (last.length < 2) return null;
-  const W=230,H=48;
-  const pts = last.map((s,i)=>({ x:(i/(last.length-1))*W, y:H-(s/100)*H }));
-  const pl  = pts.map(p=>`${p.x},${p.y}`).join(" ");
-  const avg = Math.round(last.reduce((a,b)=>a+b,0)/last.length);
-  const col = avg>=75?T.green:avg>=50?T.yellow:T.red;
-  const lp  = pts[pts.length-1];
-  return (
-    <div style={{ marginTop:14 }}>
-      <div style={{ display:"flex", justifyContent:"space-between",
-        alignItems:"center", marginBottom:6 }}>
-        <span style={{ fontSize:11, color:T.muted }}>Session timeline</span>
-        <span style={{ fontSize:11, fontWeight:600, color:col }}>avg {avg}</span>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display:"block", overflow:"visible" }}>
-        <defs>
-          <linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor={col} stopOpacity=".18"/>
-            <stop offset="100%" stopColor={col} stopOpacity="0"/>
-          </linearGradient>
-        </defs>
-        {[25,50,75].map(v=>(
-          <line key={v} x1="0" y1={H-(v/100)*H} x2={W} y2={H-(v/100)*H}
-            stroke={T.border} strokeDasharray="3,3"/>
-        ))}
-        <polygon points={`0,${H} ${pl} ${W},${H}`} fill="url(#tg)"/>
-        <polyline points={pl} fill="none" stroke={col} strokeWidth="1.5" strokeLinejoin="round"/>
-        <circle cx={lp.x} cy={lp.y} r="3" fill={col}/>
-      </svg>
-    </div>
-  );
-}
-
-function FeedbackList({ analysis }) {
-  if (!analysis) return (
-    <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-      <p style={{ fontSize:13, color:T.muted, lineHeight:1.6 }}>
-        Start a session to receive real-time gesture feedback.
-      </p>
-      {[[T.green,"Correct gesture"],[T.yellow,"Needs attention"],[T.red,"Incorrect"]].map(([c,l])=>(
-        <div key={l} style={{ display:"flex", alignItems:"center", gap:7, fontSize:12, color:T.muted }}>
-          <div style={{ width:7,height:7,borderRadius:"50%",background:c,flexShrink:0 }}/>{l}
-        </div>
-      ))}
-    </div>
-  );
-  const { issues=[],positives=[],gestures=[] } = analysis;
-  return (
-    <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-      {gestures.length>0 && (
-        <div style={{ display:"flex", flexWrap:"wrap", gap:5, marginBottom:4 }}>
-          {gestures.map((g,i)=>{
-            const tagC = g.quality==="good"
-              ?{bg:"rgba(52,199,89,.1)", text:"#1a7a34", border:"rgba(52,199,89,.25)"}
-              :g.quality==="bad"
-              ?{bg:"rgba(255,59,48,.1)", text:"#a80000", border:"rgba(255,59,48,.25)"}
-              :g.quality==="warning"
-              ?{bg:"rgba(255,159,10,.1)",text:"#7a4a00", border:"rgba(255,159,10,.25)"}
-              :{bg:"rgba(0,0,0,.05)",    text:T.muted,   border:T.border};
-            return (
-              <span key={i} style={{ fontSize:11, fontWeight:600, padding:"3px 9px",
-                borderRadius:20, background:tagC.bg, color:tagC.text,
-                border:`1px solid ${tagC.border}`, textTransform:"capitalize" }}>
-                {g.gesture.replace("_"," ")}
-              </span>
-            );
-          })}
-        </div>
-      )}
-      {positives.map((p,i)=>(
-        <div key={i} style={{ display:"flex", gap:7, alignItems:"flex-start",
-          fontSize:12, lineHeight:1.55, color:T.text }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-            style={{ flexShrink:0, marginTop:1 }}
-            stroke={T.green} strokeWidth="2.5" strokeLinecap="round">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>{p}
-        </div>
-      ))}
-      {issues.map((p,i)=>(
-        <div key={i} style={{ display:"flex", gap:7, alignItems:"flex-start",
-          fontSize:12, lineHeight:1.55, color:T.text }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-            style={{ flexShrink:0, marginTop:1 }}
-            stroke={T.yellow} strokeWidth="2.5" strokeLinecap="round">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>{p}
-        </div>
-      ))}
-      {!positives.length&&!issues.length&&(
-        <p style={{ fontSize:12, color:T.muted }}>Analysing your gestures…</p>
-      )}
-    </div>
-  );
-}
-
-function SummaryModal({ data, onClose }) {
-  const rc={Excellent:T.green,Good:T.blue,"Needs Improvement":T.yellow,Poor:T.red};
+// ── Result card shown after session ──────────────────────────────
+function ResultCard({ data, onClose, onHistory }) {
   if (!data) return null;
+  const col = data.avg_score>=75?"#30d158":data.avg_score>=50?"#ffd60a":"#ff453a";
   return (
-    <div style={{ position:"fixed",inset:0,zIndex:1000,
-      background:"rgba(0,0,0,.45)",backdropFilter:"blur(12px)",
-      display:"flex",alignItems:"center",justifyContent:"center",padding:20 }}>
-      <div style={{ background:T.surface,borderRadius:20,padding:28,
-        width:"100%",maxWidth:400,fontFamily:T.font,
-        animation:"slideUp .25s cubic-bezier(.4,0,.2,1)" }}>
-        <div style={{ display:"flex",justifyContent:"space-between",
-          alignItems:"flex-start",marginBottom:22 }}>
-          <div>
-            <p style={{ fontSize:12,color:T.muted,marginBottom:4 }}>Session complete</p>
-            <p style={{ fontSize:32,fontWeight:700,letterSpacing:"-.02em",
-              color:T.text,lineHeight:1 }}>
-              {data.avg_score}
-              <span style={{ fontSize:18,color:T.muted,fontWeight:400 }}>/100</span>
-            </p>
-            <p style={{ fontSize:13,fontWeight:600,marginTop:4,
-              color:rc[data.rating]||T.text }}>{data.rating}</p>
-          </div>
-          <button onClick={onClose} style={{ width:30,height:30,borderRadius:"50%",
-            background:"rgba(0,0,0,.06)",border:"none",cursor:"pointer",
-            display:"flex",alignItems:"center",justifyContent:"center",
-            color:T.muted,fontSize:14 }}>✕</button>
+    <div style={{
+      position:"fixed", inset:0, zIndex:200,
+      background:"rgba(0,0,0,0.75)", backdropFilter:"blur(20px)",
+      display:"flex", alignItems:"center", justifyContent:"center",
+      padding:20, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif",
+    }}>
+      <div style={{
+        background:"rgba(28,28,30,0.95)", border:"1px solid rgba(255,255,255,0.1)",
+        borderRadius:24, padding:32, width:"100%", maxWidth:420,
+        animation:"popIn .3s cubic-bezier(.34,1.56,.64,1)",
+      }}>
+        {/* Header */}
+        <div style={{textAlign:"center", marginBottom:28}}>
+          <ScoreRing score={data.avg_score} size={130}/>
+          <p style={{fontSize:22, fontWeight:700, color:"#fff",
+            letterSpacing:"-.02em", marginTop:12}}>{data.rating}</p>
+          <p style={{fontSize:13, color:"rgba(255,255,255,0.4)", marginTop:4}}>
+            Session complete
+          </p>
         </div>
-        <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",
-          gap:8,marginBottom:20 }}>
-          {[["Best",data.max_score],["Duration",`${Math.floor((data.duration_seconds||0)/60)}m`],["Frames",data.total_frames]].map(([l,v])=>(
-            <div key={l} style={{ background:T.bg,borderRadius:T.radiusSm,
-              padding:"12px 10px",textAlign:"center" }}>
-              <p style={{ fontSize:17,fontWeight:600,color:T.text,
-                letterSpacing:"-.01em" }}>{v}</p>
-              <p style={{ fontSize:10,color:T.muted,marginTop:2,
-                textTransform:"uppercase",letterSpacing:".04em" }}>{l}</p>
+
+        {/* Stats row */}
+        <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)",
+          gap:8, marginBottom:20}}>
+          {[
+            ["Best",    data.max_score],
+            ["Duration", `${Math.floor((data.duration_seconds||0)/60)}m ${(data.duration_seconds||0)%60}s`],
+            ["Frames",  data.total_frames],
+          ].map(([l,v]) => (
+            <div key={l} style={{background:"rgba(255,255,255,0.06)",
+              borderRadius:14, padding:"14px 10px", textAlign:"center"}}>
+              <p style={{fontSize:18, fontWeight:700, color:"#fff",
+                letterSpacing:"-.01em"}}>{v}</p>
+              <p style={{fontSize:10, color:"rgba(255,255,255,0.4)",
+                marginTop:3, textTransform:"uppercase", letterSpacing:".05em"}}>{l}</p>
             </div>
           ))}
         </div>
-        <div style={{ marginBottom:20 }}>
-          <p style={{ fontSize:11,color:T.muted,textTransform:"uppercase",
-            letterSpacing:".05em",marginBottom:8 }}>Quality distribution</p>
-          <div style={{ height:6,borderRadius:6,overflow:"hidden",
-            display:"flex",background:T.bg }}>
-            <div style={{ width:`${data.good_percent}%`,background:T.green,height:"100%",transition:"width .5s" }}/>
-            <div style={{ width:`${data.warn_percent}%`,background:T.yellow,height:"100%",transition:"width .5s" }}/>
-            <div style={{ width:`${data.bad_percent}%`, background:T.red,  height:"100%",transition:"width .5s" }}/>
+
+        {/* Distribution */}
+        <div style={{marginBottom:20}}>
+          <div style={{height:6, borderRadius:6, overflow:"hidden",
+            display:"flex", background:"rgba(255,255,255,0.08)", marginBottom:8}}>
+            <div style={{width:`${data.good_percent}%`, background:"#30d158", transition:"width .6s"}}/>
+            <div style={{width:`${data.warn_percent}%`, background:"#ffd60a", transition:"width .6s"}}/>
+            <div style={{width:`${data.bad_percent}%`,  background:"#ff453a", transition:"width .6s"}}/>
           </div>
-          <div style={{ display:"flex",gap:14,marginTop:7 }}>
-            {[[T.green,`${data.good_percent}% good`],[T.yellow,`${data.warn_percent}% warn`],[T.red,`${data.bad_percent}% poor`]].map(([c,l])=>(
-              <div key={l} style={{ display:"flex",alignItems:"center",gap:4 }}>
-                <div style={{ width:6,height:6,borderRadius:"50%",background:c }}/>
-                <span style={{ fontSize:11,color:T.muted }}>{l}</span>
+          <div style={{display:"flex", gap:14}}>
+            {[["#30d158",`${data.good_percent}% good`],
+              ["#ffd60a",`${data.warn_percent}% warn`],
+              ["#ff453a",`${data.bad_percent}% poor`]].map(([c,l])=>(
+              <div key={l} style={{display:"flex",alignItems:"center",gap:5}}>
+                <div style={{width:6,height:6,borderRadius:"50%",background:c}}/>
+                <span style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>{l}</span>
               </div>
             ))}
           </div>
         </div>
-        {data.tips?.length>0&&(
-          <div style={{ marginBottom:22 }}>
-            <p style={{ fontSize:11,color:T.muted,textTransform:"uppercase",
-              letterSpacing:".05em",marginBottom:8 }}>Recommendations</p>
+
+        {/* Tips */}
+        {data.tips?.length > 0 && (
+          <div style={{marginBottom:24}}>
             {data.tips.map((tip,i)=>(
-              <div key={i} style={{ display:"flex",gap:8,alignItems:"flex-start",
-                fontSize:12,color:T.muted,lineHeight:1.55,marginBottom:5 }}>
-                <span style={{ color:T.blue,fontWeight:700,flexShrink:0 }}>→</span>{tip}
+              <div key={i} style={{display:"flex", gap:10, alignItems:"flex-start",
+                marginBottom:8}}>
+                <span style={{color:"#0a84ff", fontWeight:700, fontSize:13,
+                  flexShrink:0, marginTop:1}}>→</span>
+                <span style={{fontSize:12, color:"rgba(255,255,255,0.55)",
+                  lineHeight:1.6}}>{tip}</span>
               </div>
             ))}
           </div>
         )}
-        <button onClick={onClose} style={{ width:"100%",height:44,
-          borderRadius:T.radiusSm,background:T.text,color:"#fff",border:"none",
-          fontSize:14,fontWeight:600,cursor:"pointer",letterSpacing:"-.01em",
-          fontFamily:T.font }}>Practice again</button>
-      </div>
-      <style>{`@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}`}</style>
-    </div>
-  );
-}
 
-function SessionCard({ s, onDelete }) {
-  const rc={Excellent:T.green,Good:T.blue,"Needs Improvement":T.yellow,Poor:T.red};
-  const dur = s.duration_seconds
-    ?`${Math.floor(s.duration_seconds/60)}m ${s.duration_seconds%60}s`:"—";
-  return (
-    <div style={{ background:T.surface,borderRadius:T.radius,
-      border:`1px solid ${T.border}`,padding:"16px 18px",transition:"border-color .2s" }}
-      onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(0,0,0,.18)"}
-      onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-      <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start" }}>
-        <div style={{ flex:1,minWidth:0 }}>
-          <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:6 }}>
-            <p style={{ fontSize:14,fontWeight:600,color:T.text,
-              overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{s.name}</p>
-            <span style={{ fontSize:12,fontWeight:600,
-              color:rc[s.rating]||T.muted,flexShrink:0 }}>{s.rating}</span>
-          </div>
-          <div style={{ display:"flex",gap:16,fontSize:12,color:T.muted,
-            marginBottom:10,flexWrap:"wrap" }}>
-            <span>{new Date(s.created_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>
-            <span>{dur}</span>
-            <span>Score <strong style={{ color:T.text }}>{s.avg_score}</strong></span>
-            <span>{s.total_frames} frames</span>
-          </div>
-          <div style={{ height:4,borderRadius:4,overflow:"hidden",
-            display:"flex",background:T.bg }}>
-            <div style={{ width:`${s.good_percent}%`,background:T.green,height:"100%" }}/>
-            <div style={{ width:`${s.warn_percent}%`,background:T.yellow,height:"100%" }}/>
-            <div style={{ width:`${s.bad_percent}%`, background:T.red,  height:"100%" }}/>
-          </div>
-          <div style={{ display:"flex",gap:12,marginTop:5,fontSize:11,color:T.hint }}>
-            <span>{s.good_percent}% good</span>
-            <span>{s.warn_percent}% warning</span>
-            <span>{s.bad_percent}% poor</span>
-          </div>
+        {/* Buttons */}
+        <div style={{display:"flex", gap:10}}>
+          <button onClick={onHistory} style={{
+            flex:1, height:46, borderRadius:14,
+            background:"rgba(255,255,255,0.08)",
+            border:"1px solid rgba(255,255,255,0.1)",
+            color:"#fff", fontSize:14, fontWeight:600,
+            cursor:"pointer", letterSpacing:"-.01em",
+            fontFamily:"inherit",
+          }}>View history</button>
+          <button onClick={onClose} style={{
+            flex:1, height:46, borderRadius:14,
+            background:"#fff", border:"none",
+            color:"#000", fontSize:14, fontWeight:600,
+            cursor:"pointer", letterSpacing:"-.01em",
+            fontFamily:"inherit",
+          }}>Practice again</button>
         </div>
-        <button onClick={()=>onDelete(s.id)} style={{ marginLeft:12,width:28,height:28,
-          borderRadius:"50%",background:"transparent",border:`1px solid ${T.border}`,
-          cursor:"pointer",color:T.hint,fontSize:13,flexShrink:0,
-          display:"flex",alignItems:"center",justifyContent:"center",transition:"all .15s" }}
-          onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,59,48,.08)";
-            e.currentTarget.style.color=T.red;e.currentTarget.style.borderColor="rgba(255,59,48,.3)"}}
-          onMouseLeave={e=>{e.currentTarget.style.background="transparent";
-            e.currentTarget.style.color=T.hint;e.currentTarget.style.borderColor=T.border}}>✕
-        </button>
       </div>
+      <style>{`@keyframes popIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}`}</style>
     </div>
   );
 }
 
-// ── Main ──────────────────────────────────────────────────────────
+// ── History page ──────────────────────────────────────────────────
+function HistoryView({ onBack }) {
+  const [sessions,  setSessions]  = useState([]);
+  const [stats,     setStats]     = useState(null);
+  const [loading,   setLoading]   = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [sr, st] = await Promise.all([
+          fetch(`${BACKEND_URL}/api/speakwell/sessions`).then(r=>r.json()),
+          fetch(`${BACKEND_URL}/api/speakwell/stats`).then(r=>r.json()),
+        ]);
+        setSessions(sr.sessions||[]);
+        setStats(st.stats||null);
+      } catch {}
+      setLoading(false);
+    })();
+  }, []);
+
+  const del = async id => {
+    await fetch(`${BACKEND_URL}/api/speakwell/sessions/${id}`,{method:"DELETE"});
+    setSessions(p=>p.filter(s=>s.id!==id));
+  };
+
+  const rc = {Excellent:"#30d158",Good:"#0a84ff","Needs Improvement":"#ffd60a",Poor:"#ff453a"};
+
+  return (
+    <div style={{
+      minHeight:"100vh", background:"#000",
+      fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif",
+      color:"#fff",
+    }}>
+      {/* Header */}
+      <div style={{
+        position:"sticky", top:0, zIndex:10,
+        background:"rgba(0,0,0,0.8)", backdropFilter:"blur(20px)",
+        borderBottom:"1px solid rgba(255,255,255,0.08)",
+        padding:"0 20px", height:56,
+        display:"flex", alignItems:"center", justifyContent:"space-between",
+      }}>
+        <button onClick={onBack} style={{
+          display:"flex", alignItems:"center", gap:6,
+          background:"none", border:"none", color:"#0a84ff",
+          fontSize:15, cursor:"pointer", fontFamily:"inherit", fontWeight:500,
+        }}>
+          <svg width="9" height="15" viewBox="0 0 9 15" fill="none">
+            <path d="M8 1L1 7.5L8 14" stroke="#0a84ff" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Back
+        </button>
+        <span style={{fontSize:16, fontWeight:600, letterSpacing:"-.01em"}}>History</span>
+        <div style={{width:50}}/>
+      </div>
+
+      <div style={{maxWidth:680, margin:"0 auto", padding:"24px 16px"}}>
+        {/* Stats */}
+        {stats && (
+          <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)",
+            gap:8, marginBottom:24}}>
+            {[
+              ["Sessions",  stats.total_sessions??0],
+              ["Avg",       stats.overall_avg??"—"],
+              ["Best",      stats.best_score??"—"],
+              ["Minutes",   stats.total_minutes?`${stats.total_minutes}m`:"0m"],
+            ].map(([l,v])=>(
+              <div key={l} style={{
+                background:"rgba(255,255,255,0.06)",
+                border:"1px solid rgba(255,255,255,0.08)",
+                borderRadius:16, padding:"16px 12px", textAlign:"center",
+              }}>
+                <p style={{fontSize:22, fontWeight:700, letterSpacing:"-.02em"}}>{v}</p>
+                <p style={{fontSize:10, color:"rgba(255,255,255,0.4)",
+                  marginTop:4, textTransform:"uppercase", letterSpacing:".05em"}}>{l}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {loading ? (
+          <div style={{textAlign:"center", padding:60}}>
+            <div style={{width:32, height:32, borderRadius:"50%",
+              border:"2px solid rgba(255,255,255,0.1)",
+              borderTop:"2px solid #fff",
+              animation:"spin 1s linear infinite", margin:"0 auto"}}/>
+          </div>
+        ) : sessions.length===0 ? (
+          <div style={{textAlign:"center", padding:"60px 20px"}}>
+            <p style={{fontSize:40, marginBottom:16}}>🎤</p>
+            <p style={{fontSize:17, fontWeight:600, marginBottom:8}}>No sessions yet</p>
+            <p style={{fontSize:14, color:"rgba(255,255,255,0.4)"}}>
+              Complete a practice session to see results here
+            </p>
+          </div>
+        ) : (
+          <div style={{display:"flex", flexDirection:"column", gap:10}}>
+            {sessions.map(s=>(
+              <div key={s.id} style={{
+                background:"rgba(255,255,255,0.05)",
+                border:"1px solid rgba(255,255,255,0.08)",
+                borderRadius:18, padding:"18px 20px",
+              }}>
+                <div style={{display:"flex", justifyContent:"space-between",
+                  alignItems:"flex-start", marginBottom:10}}>
+                  <div style={{flex:1, minWidth:0}}>
+                    <p style={{fontSize:15, fontWeight:600,
+                      overflow:"hidden", textOverflow:"ellipsis",
+                      whiteSpace:"nowrap", marginBottom:4}}>{s.name}</p>
+                    <div style={{display:"flex", gap:12, fontSize:12,
+                      color:"rgba(255,255,255,0.4)", flexWrap:"wrap"}}>
+                      <span>{new Date(s.created_at).toLocaleDateString("en-US",
+                        {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</span>
+                      <span>{Math.floor(s.duration_seconds/60)}m {s.duration_seconds%60}s</span>
+                      <span>Score <strong style={{color:"#fff"}}>{s.avg_score}</strong></span>
+                    </div>
+                  </div>
+                  <div style={{display:"flex", alignItems:"center", gap:10, flexShrink:0}}>
+                    <span style={{fontSize:12, fontWeight:700,
+                      color:rc[s.rating]||"#fff"}}>{s.rating}</span>
+                    <button onClick={()=>del(s.id)} style={{
+                      width:28, height:28, borderRadius:"50%",
+                      background:"rgba(255,59,48,0.15)",
+                      border:"1px solid rgba(255,59,48,0.3)",
+                      color:"#ff453a", cursor:"pointer", fontSize:13,
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                    }}>✕</button>
+                  </div>
+                </div>
+                {/* Bar */}
+                <div style={{height:4, borderRadius:4, overflow:"hidden",
+                  display:"flex", background:"rgba(255,255,255,0.08)"}}>
+                  <div style={{width:`${s.good_percent}%`,background:"#30d158",height:"100%"}}/>
+                  <div style={{width:`${s.warn_percent}%`,background:"#ffd60a",height:"100%"}}/>
+                  <div style={{width:`${s.bad_percent}%`, background:"#ff453a",height:"100%"}}/>
+                </div>
+                <div style={{display:"flex", gap:12, marginTop:6,
+                  fontSize:11, color:"rgba(255,255,255,0.3)"}}>
+                  <span>{s.good_percent}% good</span>
+                  <span>{s.warn_percent}% warn</span>
+                  <span>{s.bad_percent}% poor</span>
+                  <span style={{marginLeft:"auto"}}>{s.total_frames} frames</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+}
+
+// ── MAIN ─────────────────────────────────────────────────────────
 export default function SpeakWell() {
   const videoRef    = useRef(null);
-  const canvasRef   = useRef(null);  // overlay canvas
+  const canvasRef   = useRef(null);
   const captureRef  = useRef(document.createElement("canvas"));
   const streamRef   = useRef(null);
   const intervalRef = useRef(null);
@@ -411,452 +358,386 @@ export default function SpeakWell() {
   const rafRef      = useRef(null);
   const scoresRef   = useRef([]);
   const timelineRef = useRef([]);
-  const landmarksRef= useRef(null);  // latest landmarks for canvas draw
+  const landmarksRef= useRef(null);
   const analysisRef = useRef(null);
 
-  const [tab,         setTab]         = useState("practice");
+  const [view,        setView]        = useState("practice"); // practice | history
   const [camReady,    setCamReady]    = useState(false);
   const [recording,   setRecording]   = useState(false);
   const [elapsed,     setElapsed]     = useState(0);
   const [analysis,    setAnalysis]    = useState(null);
   const [scores,      setScores]      = useState([]);
   const [mlOn,        setMlOn]        = useState(false);
-  const [apiError,    setApiError]    = useState("");
   const [sessName,    setSessName]    = useState("");
-  const [sessions,    setSessions]    = useState([]);
-  const [stats,       setStats]       = useState(null);
-  const [loadingHist, setLoadingHist] = useState(false);
   const [summaryData, setSummaryData] = useState(null);
   const [saving,      setSaving]      = useState(false);
-  const [fps,         setFps]         = useState(0);
+  const [showName,    setShowName]    = useState(false);
 
-  // ── Camera ────────────────────────────────────────────────────
-  useEffect(() => {
+  // Camera
+  useEffect(()=>{
     navigator.mediaDevices
-      .getUserMedia({ video:{ width:640,height:480,facingMode:"user" }, audio:false })
-      .then(stream => {
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.onloadedmetadata = () => {
-            videoRef.current.play();
-            setCamReady(true);
+      .getUserMedia({video:{width:1280,height:720,facingMode:"user"},audio:false})
+      .then(stream=>{
+        streamRef.current=stream;
+        if(videoRef.current){
+          videoRef.current.srcObject=stream;
+          videoRef.current.onloadedmetadata=()=>{
+            videoRef.current.play(); setCamReady(true);
           };
         }
-      }).catch(e => setApiError("Camera: " + e.message));
-    return () => streamRef.current?.getTracks().forEach(t => t.stop());
-  }, []);
+      }).catch(console.error);
+    return ()=>streamRef.current?.getTracks().forEach(t=>t.stop());
+  },[]);
 
-  // ── RAF loop — draws skeleton on canvas at 30fps ──────────────
-  useEffect(() => {
-    const loop = () => {
-      const canvas = canvasRef.current;
-      const video  = videoRef.current;
-      if (canvas && video && video.readyState >= 2) {
-        // Size canvas to match video display size
-        if (canvas.width !== video.videoWidth) {
-          canvas.width  = video.videoWidth  || 640;
-          canvas.height = video.videoHeight || 480;
+  // RAF canvas loop
+  useEffect(()=>{
+    const loop=()=>{
+      const cv=canvasRef.current, v=videoRef.current;
+      if(cv&&v&&v.readyState>=2){
+        if(cv.width!==v.videoWidth){
+          cv.width=v.videoWidth||1280; cv.height=v.videoHeight||720;
         }
-        drawSkeleton(canvas, landmarksRef.current, analysisRef.current);
+        drawSkeleton(cv,landmarksRef.current,analysisRef.current);
       }
-      rafRef.current = requestAnimationFrame(loop);
+      rafRef.current=requestAnimationFrame(loop);
     };
-    rafRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, []);
+    rafRef.current=requestAnimationFrame(loop);
+    return ()=>cancelAnimationFrame(rafRef.current);
+  },[]);
 
-  // ── History loader ────────────────────────────────────────────
-  useEffect(() => {
-    if (tab === "history") loadHistory();
-  }, [tab]);
-
-  const loadHistory = async () => {
-    setLoadingHist(true);
-    try {
-      const [sr, st] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/speakwell/sessions`).then(r=>r.json()),
-        fetch(`${BACKEND_URL}/api/speakwell/stats`).then(r=>r.json()),
-      ]);
-      setSessions(sr.sessions || []);
-      setStats(st.stats || null);
-    } catch { setApiError("Could not load history"); }
-    setLoadingHist(false);
-  };
-
-  // ── Send frame to ML (1 per second) — only JSON back ─────────
-  const fpsCounter = useRef(0);
-  const fpsTimer   = useRef(null);
-
-  const sendFrame = useCallback(async () => {
-    const video = videoRef.current;
-    if (!video || video.readyState < 2) return;
-    const cap = captureRef.current;
-    cap.width = 320; cap.height = 240;  // smaller = faster upload
-    cap.getContext("2d").drawImage(video, 0, 0, 320, 240);
-    const frame = cap.toDataURL("image/jpeg", 0.6);  // lower quality = faster
-
-    try {
-      const res = await fetch(`${ML_URL}/analyze`, {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ frame }),
-        signal: AbortSignal.timeout(4000),
+  const sendFrame = useCallback(async()=>{
+    const v=videoRef.current;
+    if(!v||v.readyState<2) return;
+    const cap=captureRef.current;
+    cap.width=320; cap.height=180;
+    cap.getContext("2d").drawImage(v,0,0,320,180);
+    const frame=cap.toDataURL("image/jpeg",0.55);
+    try{
+      const res=await fetch(`${ML_URL}/analyze`,{
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({frame}), signal:AbortSignal.timeout(4000),
       });
-      if (!res.ok) throw new Error(`ML ${res.status}`);
-      const data = await res.json();
-
-      // Store landmarks + analysis — RAF loop draws them
-      landmarksRef.current = data.landmarks;
-      analysisRef.current  = data.analysis;
+      if(!res.ok) return;
+      const data=await res.json();
+      landmarksRef.current=data.landmarks;
+      analysisRef.current=data.analysis;
       setAnalysis(data.analysis);
       setMlOn(true);
-      setApiError("");
-
-      const sc = data.analysis?.score || 0;
+      const sc=data.analysis?.score||0;
       scoresRef.current.push(sc);
-      timelineRef.current.push({ timestamp: Date.now(), score: sc });
+      timelineRef.current.push({timestamp:Date.now(),score:sc});
       setScores([...scoresRef.current]);
-      fpsCounter.current++;
-    } catch (e) {
-      setMlOn(false);
-    }
-  }, []);
+    }catch{ setMlOn(false); }
+  },[]);
 
-  const startSession = () => {
-    scoresRef.current   = [];
-    timelineRef.current = [];
-    landmarksRef.current = null;
-    analysisRef.current  = null;
+  const startSession=()=>{
+    scoresRef.current=[]; timelineRef.current=[];
+    landmarksRef.current=null; analysisRef.current=null;
     setScores([]); setElapsed(0); setRecording(true);
-    setAnalysis(null);
-
-    // Send 1 frame/sec to ML — canvas draws at 30fps
-    intervalRef.current = setInterval(sendFrame, 1000);
-    timerRef.current    = setInterval(() => setElapsed(p => p+1), 1000);
-    fpsCounter.current  = 0;
-    fpsTimer.current    = setInterval(() => {
-      setFps(fpsCounter.current);
-      fpsCounter.current = 0;
-    }, 1000);
+    setAnalysis(null); setShowName(false);
+    intervalRef.current=setInterval(sendFrame,1000);
+    timerRef.current=setInterval(()=>setElapsed(p=>p+1),1000);
   };
 
-  const stopSession = async () => {
+  const stopSession=async()=>{
     setRecording(false);
     clearInterval(intervalRef.current);
     clearInterval(timerRef.current);
-    clearInterval(fpsTimer.current);
-    landmarksRef.current = null;
-    analysisRef.current  = null;
-    const sc = scoresRef.current;
-    if (!sc.length) return;
+    landmarksRef.current=null; analysisRef.current=null;
+    const sc=scoresRef.current;
+    if(!sc.length) return;
     setSaving(true);
-    try {
-      const sumRes  = await fetch(`${ML_URL}/analyze_session`, {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ scores: sc }),
-      });
-      const summary = await sumRes.json();
-      await fetch(`${BACKEND_URL}/api/speakwell/sessions`, {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          name:             sessName || `Session ${new Date().toLocaleString()}`,
+    try{
+      const [sumRes]=await Promise.all([
+        fetch(`${ML_URL}/analyze_session`,{
+          method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({scores:sc}),
+        }).then(r=>r.json()),
+      ]);
+      // Save to Supabase via backend
+      await fetch(`${BACKEND_URL}/api/speakwell/sessions`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          name:             sessName||`Session ${new Date().toLocaleString()}`,
           created_at:       new Date().toISOString(),
           duration_seconds: elapsed,
-          avg_score:        summary.avg_score,
-          max_score:        summary.max_score,
-          good_percent:     summary.good_percent,
-          warn_percent:     summary.warn_percent,
-          bad_percent:      summary.bad_percent,
+          avg_score:        sumRes.avg_score,
+          max_score:        sumRes.max_score,
+          good_percent:     sumRes.good_percent,
+          warn_percent:     sumRes.warn_percent,
+          bad_percent:      sumRes.bad_percent,
           total_frames:     sc.length,
-          rating:           summary.rating,
-          tips:             summary.tips,
+          rating:           sumRes.rating,
+          tips:             sumRes.tips,
           score_timeline:   timelineRef.current,
         }),
       });
-      setSummaryData({ ...summary, duration_seconds: elapsed });
+      setSummaryData({...sumRes, duration_seconds:elapsed});
       setSessName("");
-    } catch(e) { setApiError("Save failed: " + e.message); }
+    }catch(e){console.error(e);}
     setSaving(false);
   };
 
-  const deleteSession = async id => {
-    try {
-      await fetch(`${BACKEND_URL}/api/speakwell/sessions/${id}`,{ method:"DELETE" });
-      setSessions(p => p.filter(s => s.id !== id));
-    } catch(e) { setApiError(e.message); }
-  };
-
-  const fmt = s => `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
-  const borderCol = analysis?.color==="green" ?"rgba(52,199,89,.45)"
-    :analysis?.color==="red"    ?"rgba(255,59,48,.45)"
-    :analysis?.color==="yellow" ?"rgba(255,159,10,.45)"
-    :T.border;
-  const statusLabel = analysis?.color==="green" ?"Good gesture"
+  const fmt=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+  const score = analysis?.score||0;
+  const scoreCol = score>=75?"#30d158":score>=50?"#ffd60a":score>0?"#ff453a":"rgba(255,255,255,0.3)";
+  const statusLabel = analysis?.color==="green"?"Good gesture"
     :analysis?.color==="yellow"?"Needs attention"
-    :analysis?.color==="red"   ?"Incorrect gesture"
-    :"Ready";
+    :analysis?.color==="red"?"Incorrect gesture":"Ready";
+
+  if(view==="history") return <HistoryView onBack={()=>setView("practice")}/>;
 
   return (
-    <div style={{ background:T.bg, minHeight:"100vh", fontFamily:T.font,
-      color:T.text, WebkitFontSmoothing:"antialiased" }}>
+    <div style={{
+      position:"relative", width:"100%", height:"100vh",
+      background:"#000", overflow:"hidden",
+      fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif",
+    }}>
 
-      {summaryData && <SummaryModal data={summaryData} onClose={()=>setSummaryData(null)}/>}
+      {/* Result modal */}
+      {summaryData && (
+        <ResultCard
+          data={summaryData}
+          onClose={()=>setSummaryData(null)}
+          onHistory={()=>{setSummaryData(null);setView("history");}}
+        />
+      )}
 
-      {/* Nav */}
-      <div style={{ background:"rgba(245,245,247,.85)", backdropFilter:"blur(20px)",
-        borderBottom:`1px solid ${T.border}`, position:"sticky", top:0, zIndex:100 }}>
-        <div style={{ maxWidth:960, margin:"0 auto", padding:"0 20px",
-          height:52, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <div style={{ width:28, height:28, borderRadius:8, background:T.text,
-              display:"flex", alignItems:"center", justifyContent:"center" }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-                stroke="#fff" strokeWidth="2.2" strokeLinecap="round">
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                <line x1="12" y1="19" x2="12" y2="22"/>
-              </svg>
-            </div>
-            <span style={{ fontSize:15, fontWeight:600, letterSpacing:"-.02em" }}>SpeakWell</span>
+      {/* Fullscreen video */}
+      <video ref={videoRef} muted playsInline
+        style={{
+          position:"absolute", inset:0,
+          width:"100%", height:"100%",
+          objectFit:"cover",
+          transform:"scaleX(-1)", // mirror
+        }}/>
+
+      {/* Skeleton canvas overlay */}
+      <canvas ref={canvasRef} style={{
+        position:"absolute", inset:0,
+        width:"100%", height:"100%",
+        transform:"scaleX(-1)",
+        pointerEvents:"none",
+      }}/>
+
+      {/* Dark vignette edges */}
+      <div style={{
+        position:"absolute", inset:0, pointerEvents:"none",
+        background:"radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.55) 100%)",
+      }}/>
+
+      {/* Top bar */}
+      <div style={{
+        position:"absolute", top:0, left:0, right:0,
+        padding:"16px 20px",
+        display:"flex", alignItems:"center", justifyContent:"space-between",
+        background:"linear-gradient(to bottom,rgba(0,0,0,0.6) 0%,transparent 100%)",
+      }}>
+        {/* Brand */}
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{width:30,height:30,borderRadius:9,
+            background:"rgba(255,255,255,0.15)",backdropFilter:"blur(10px)",
+            border:"1px solid rgba(255,255,255,0.2)",
+            display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+              stroke="#fff" strokeWidth="2.2" strokeLinecap="round">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="22"/>
+            </svg>
           </div>
-          <div style={{ display:"flex", gap:2 }}>
-            {["practice","history"].map(t=>(
-              <button key={t} onClick={()=>setTab(t)} style={{
-                padding:"6px 14px", borderRadius:T.radiusSm, border:"none",
-                fontSize:13, fontWeight:500, cursor:"pointer",
-                letterSpacing:"-.01em", textTransform:"capitalize",
-                background: tab===t?T.text:"transparent",
-                color:      tab===t?"#fff":T.muted,
-                transition:"all .15s" }}>{t}</button>
-            ))}
-          </div>
-          <div style={{ display:"flex", alignItems:"center", gap:6,
-            padding:"4px 10px", borderRadius:20,
-            background: mlOn?"rgba(52,199,89,.1)":"rgba(0,0,0,.05)",
-            border:`1px solid ${mlOn?"rgba(52,199,89,.3)":T.border}` }}>
-            <div style={{ width:6, height:6, borderRadius:"50%",
-              background: mlOn?T.green:T.hint }}/>
-            <span style={{ fontSize:11, fontWeight:600,
-              color: mlOn?"#1a7a34":T.muted }}>
-              {mlOn ? `ML live` : "ML offline"}
+          <span style={{fontSize:16,fontWeight:600,color:"#fff",
+            letterSpacing:"-.01em",textShadow:"0 1px 4px rgba(0,0,0,0.4)"}}>SpeakWell</span>
+        </div>
+
+        {/* ML status + history */}
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          {/* ML pill */}
+          <div style={{
+            display:"flex",alignItems:"center",gap:5,
+            padding:"5px 12px",borderRadius:20,
+            background:"rgba(0,0,0,0.4)",backdropFilter:"blur(10px)",
+            border:`1px solid ${mlOn?"rgba(48,209,88,0.4)":"rgba(255,255,255,0.15)"}`,
+          }}>
+            <div style={{width:6,height:6,borderRadius:"50%",
+              background:mlOn?"#30d158":"rgba(255,255,255,0.3)",
+              boxShadow:mlOn?"0 0 6px #30d158":"none"}}/>
+            <span style={{fontSize:12,fontWeight:500,
+              color:mlOn?"#30d158":"rgba(255,255,255,0.5)"}}>
+              {mlOn?"ML live":"ML offline"}
             </span>
           </div>
+
+          {/* History button */}
+          {!recording && (
+            <button onClick={()=>setView("history")} style={{
+              padding:"6px 14px",borderRadius:20,
+              background:"rgba(0,0,0,0.4)",backdropFilter:"blur(10px)",
+              border:"1px solid rgba(255,255,255,0.15)",
+              color:"#fff",fontSize:13,fontWeight:500,cursor:"pointer",
+              fontFamily:"inherit",
+            }}>History</button>
+          )}
         </div>
       </div>
 
-      <div style={{ maxWidth:960, margin:"0 auto", padding:"28px 20px" }}>
+      {/* Live score — top right during recording */}
+      {recording && (
+        <div style={{
+          position:"absolute", top:16, right:20,
+          display:"flex", flexDirection:"column", alignItems:"flex-end",
+        }}>
+          <ScoreRing score={score} size={80}/>
+        </div>
+      )}
 
-        {apiError && (
-          <div style={{ padding:"10px 16px", borderRadius:T.radiusSm, marginBottom:16,
-            background:"rgba(255,59,48,.07)", border:`1px solid rgba(255,59,48,.2)`,
-            fontSize:12, color:T.red, display:"flex", alignItems:"center", gap:8 }}>
-            ⚠ {apiError}
-            <button onClick={()=>setApiError("")} style={{ marginLeft:"auto",
-              background:"none",border:"none",cursor:"pointer",color:T.hint }}>✕</button>
+      {/* Status badge — center top during recording */}
+      {recording && analysis && (
+        <div style={{
+          position:"absolute", top:110, left:"50%",
+          transform:"translateX(-50%)",
+          padding:"6px 16px", borderRadius:20,
+          background:"rgba(0,0,0,0.5)", backdropFilter:"blur(10px)",
+          border:`1px solid ${scoreCol}40`,
+          display:"flex", alignItems:"center", gap:7,
+        }}>
+          <div style={{width:7,height:7,borderRadius:"50%",background:scoreCol}}/>
+          <span style={{fontSize:13,fontWeight:600,color:scoreCol}}>{statusLabel}</span>
+        </div>
+      )}
+
+      {/* Bottom panel */}
+      <div style={{
+        position:"absolute", bottom:0, left:0, right:0,
+        padding:"0 20px 32px",
+        background:"linear-gradient(to top,rgba(0,0,0,0.8) 0%,transparent 100%)",
+      }}>
+
+        {/* Live feedback pills during recording */}
+        {recording && analysis && (
+          <div style={{
+            display:"flex", flexWrap:"wrap", gap:7,
+            justifyContent:"center", marginBottom:16,
+          }}>
+            {(analysis.positives||[]).slice(0,2).map((p,i)=>(
+              <div key={i} style={{
+                padding:"5px 13px", borderRadius:20,
+                background:"rgba(48,209,88,0.15)",
+                border:"1px solid rgba(48,209,88,0.3)",
+                fontSize:12, color:"#30d158",
+              }}>{p}</div>
+            ))}
+            {(analysis.issues||[]).slice(0,2).map((p,i)=>(
+              <div key={i} style={{
+                padding:"5px 13px", borderRadius:20,
+                background:"rgba(255,212,10,0.15)",
+                border:"1px solid rgba(255,212,10,0.3)",
+                fontSize:12, color:"#ffd60a",
+              }}>{p}</div>
+            ))}
           </div>
         )}
 
-        {/* ── PRACTICE ── */}
-        {tab==="practice" && (
-          <div>
-            <div style={{ display:"flex", alignItems:"center",
-              justifyContent:"space-between", marginBottom:20, flexWrap:"wrap", gap:10 }}>
-              <div>
-                <h1 style={{ fontSize:26, fontWeight:700, letterSpacing:"-.03em",
-                  marginBottom:2 }}>Practice</h1>
-                <p style={{ fontSize:13, color:T.muted }}>Real-time gesture analysis</p>
-              </div>
-              <input value={sessName} onChange={e=>setSessName(e.target.value)}
-                placeholder="Session name" disabled={recording}
-                style={{ height:36, borderRadius:T.radiusSm,
-                  border:`1px solid ${T.border}`, padding:"0 14px",
-                  fontSize:13, background:T.surface, color:T.text,
-                  outline:"none", width:220, fontFamily:T.font }}/>
-            </div>
-
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 268px",
-              gap:16, alignItems:"start" }}>
-
-              {/* Camera + canvas overlay */}
-              <div style={{ borderRadius:T.radius, overflow:"hidden",
-                background:"#000", border:`2px solid ${borderCol}`,
-                transition:"border-color .3s", position:"relative" }}>
-                <div style={{ position:"relative", aspectRatio:"16/10" }}>
-                  {/* Raw video feed */}
-                  <video ref={videoRef} muted playsInline
-                    style={{ width:"100%", height:"100%", objectFit:"cover",
-                      display:"block" }}/>
-                  {/* Canvas overlay — skeleton drawn here at 30fps */}
-                  <canvas ref={canvasRef}
-                    style={{ position:"absolute", inset:0,
-                      width:"100%", height:"100%",
-                      pointerEvents:"none" }}/>
-                  {!camReady && (
-                    <div style={{ position:"absolute", inset:0,
-                      display:"flex", alignItems:"center", justifyContent:"center" }}>
-                      <p style={{ color:"rgba(255,255,255,.3)", fontSize:13 }}>Starting camera…</p>
-                    </div>
-                  )}
-                  <div style={{ position:"absolute", top:12, left:12 }}>
-                    <StatusPill color={analysis?.color||"neutral"} label={statusLabel}/>
-                  </div>
-                  {recording && (
-                    <div style={{ position:"absolute", top:12, right:12,
-                      display:"flex", alignItems:"center", gap:6,
-                      padding:"5px 12px", borderRadius:20,
-                      background:"rgba(0,0,0,.6)", backdropFilter:"blur(8px)",
-                      color:"#fff", fontSize:13, fontFamily:"monospace" }}>
-                      <div style={{ width:7, height:7, borderRadius:"50%",
-                        background:T.red, animation:"blink 1.1s infinite" }}/>
-                      {fmt(elapsed)}
-                    </div>
-                  )}
-                  {recording && (
-                    <div style={{ position:"absolute", bottom:10, right:12,
-                      fontSize:11, color:"rgba(255,255,255,.3)", fontFamily:"monospace" }}>
-                      {fps} req/s
-                    </div>
-                  )}
-                </div>
-                <div style={{ padding:"14px 16px", display:"flex", gap:8,
-                  borderTop:"1px solid rgba(255,255,255,.06)",
-                  background:"rgba(10,10,10,.95)" }}>
-                  {!recording ? (
-                    <button onClick={startSession} disabled={!camReady} style={{
-                      flex:1, height:38, borderRadius:T.radiusSm, border:"none",
-                      background: camReady?T.green:"rgba(52,199,89,.3)",
-                      color:"#fff", fontSize:13, fontWeight:600,
-                      cursor: camReady?"pointer":"not-allowed",
-                      fontFamily:T.font, letterSpacing:"-.01em",
-                      display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff">
-                        <polygon points="5 3 19 12 5 21 5 3"/>
-                      </svg>
-                      {camReady?"Start session":"Starting camera…"}
-                    </button>
-                  ) : (
-                    <button onClick={stopSession} disabled={saving} style={{
-                      flex:1, height:38, borderRadius:T.radiusSm, border:"none",
-                      background:T.red, color:"#fff", fontSize:13, fontWeight:600,
-                      cursor:"pointer", fontFamily:T.font, letterSpacing:"-.01em",
-                      display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="#fff">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                      </svg>
-                      {saving?"Saving…":"Stop & save"}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Right panel */}
-              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                <Card>
-                  <Label>Gesture score</Label>
-                  <ScoreArc score={analysis?.score||0}/>
-                  <MiniTimeline scores={scores}/>
-                </Card>
-                <Card>
-                  <div style={{ display:"flex", justifyContent:"space-between",
-                    alignItems:"center", marginBottom:12 }}>
-                    <Label style={{ marginBottom:0 }}>Live feedback</Label>
-                  </div>
-                  <FeedbackList analysis={analysis}/>
-                </Card>
-              </div>
-            </div>
-
-            {/* Tips */}
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)",
-              gap:10, marginTop:16 }}>
-              {[
-                ["🤲","Open palms","Face palms outward to signal openness"],
-                ["📐","Gesture zone","Keep hands between waist and shoulders"],
-                ["⚖️","Symmetry","Use both hands equally for emphasis"],
-                ["✋","No fists","Closed hands signal tension or anxiety"],
-              ].map(([icon,title,desc])=>(
-                <Card key={title} style={{ padding:"14px 16px" }}>
-                  <div style={{ fontSize:20, marginBottom:8 }}>{icon}</div>
-                  <p style={{ fontSize:12, fontWeight:600, marginBottom:4 }}>{title}</p>
-                  <p style={{ fontSize:11, color:T.muted, lineHeight:1.55 }}>{desc}</p>
-                </Card>
-              ))}
-            </div>
+        {/* Timer */}
+        {recording && (
+          <div style={{
+            textAlign:"center", marginBottom:20,
+            fontFamily:"monospace", fontSize:36,
+            fontWeight:700, color:"#fff", letterSpacing:".05em",
+            textShadow:"0 2px 8px rgba(0,0,0,0.5)",
+          }}>
+            <span style={{width:8,height:8,borderRadius:"50%",
+              background:"#ff453a",display:"inline-block",
+              marginRight:10,marginBottom:3,
+              animation:"blink 1.1s infinite"}}/>
+            {fmt(elapsed)}
           </div>
         )}
 
-        {/* ── HISTORY ── */}
-        {tab==="history" && (
-          <div>
-            <div style={{ display:"flex", justifyContent:"space-between",
-              alignItems:"center", marginBottom:20 }}>
-              <div>
-                <h1 style={{ fontSize:26, fontWeight:700, letterSpacing:"-.03em",
-                  marginBottom:2 }}>History</h1>
-                <p style={{ fontSize:13, color:T.muted }}>Your practice sessions</p>
-              </div>
-              <button onClick={loadHistory} style={{ height:34, padding:"0 14px",
-                borderRadius:T.radiusSm, border:`1px solid ${T.border}`,
-                background:T.surface, fontSize:12, color:T.muted, cursor:"pointer",
-                fontFamily:T.font, display:"flex", alignItems:"center", gap:5 }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-                  style={{ animation:loadingHist?"spin 1s linear infinite":"none" }}>
-                  <polyline points="23 4 23 10 17 10"/>
-                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-                </svg>
-                Refresh
+        {/* Session name input (shown before start) */}
+        {!recording && showName && (
+          <div style={{maxWidth:320, margin:"0 auto 14px"}}>
+            <input
+              value={sessName}
+              onChange={e=>setSessName(e.target.value)}
+              placeholder="Session name (optional)"
+              autoFocus
+              style={{
+                width:"100%", height:46, borderRadius:14,
+                background:"rgba(255,255,255,0.1)",
+                backdropFilter:"blur(10px)",
+                border:"1px solid rgba(255,255,255,0.2)",
+                color:"#fff", fontSize:15, padding:"0 16px",
+                outline:"none", fontFamily:"inherit",
+                textAlign:"center",
+              }}/>
+          </div>
+        )}
+
+        {/* Main button */}
+        <div style={{display:"flex", justifyContent:"center", gap:12}}>
+          {!recording ? (
+            <>
+              {!showName && (
+                <button onClick={()=>setShowName(true)} style={{
+                  width:56, height:56, borderRadius:"50%",
+                  background:"rgba(255,255,255,0.1)",
+                  backdropFilter:"blur(10px)",
+                  border:"1px solid rgba(255,255,255,0.2)",
+                  color:"rgba(255,255,255,0.7)", fontSize:20,
+                  cursor:"pointer", display:"flex",
+                  alignItems:"center", justifyContent:"center",
+                }}>✎</button>
+              )}
+              <button
+                onClick={camReady ? startSession : undefined}
+                style={{
+                  width:72, height:72, borderRadius:"50%",
+                  background: camReady?"#fff":"rgba(255,255,255,0.3)",
+                  border:"none", cursor:camReady?"pointer":"default",
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  boxShadow:camReady?"0 4px 24px rgba(0,0,0,0.4)":"none",
+                  transition:"all .2s",
+                }}>
+                <div style={{
+                  width:28, height:28, borderRadius:"50%",
+                  background:"#000",
+                }}/>
               </button>
-            </div>
-            {stats && (
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)",
-                gap:10, marginBottom:20 }}>
-                {[
-                  ["Sessions",   stats.total_sessions??0],
-                  ["Avg score",  stats.overall_avg??"—"],
-                  ["Best score", stats.best_score??"—"],
-                  ["Minutes",    stats.total_minutes?`${stats.total_minutes}m`:"0m"],
-                ].map(([l,v])=>(
-                  <Card key={l} style={{ textAlign:"center" }}>
-                    <p style={{ fontSize:24,fontWeight:700,letterSpacing:"-.02em",
-                      color:T.text,marginBottom:4 }}>{v}</p>
-                    <p style={{ fontSize:11,color:T.muted,textTransform:"uppercase",
-                      letterSpacing:".05em" }}>{l}</p>
-                  </Card>
-                ))}
-              </div>
-            )}
-            {loadingHist ? (
-              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                {[1,2,3].map(i=>(
-                  <div key={i} style={{ height:100, borderRadius:T.radius,
-                    background:T.surface, border:`1px solid ${T.border}`,
-                    animation:"pulse 1.4s ease-in-out infinite" }}/>
-                ))}
-              </div>
-            ) : sessions.length===0 ? (
-              <div style={{ textAlign:"center", padding:"60px 20px" }}>
-                <div style={{ fontSize:40, marginBottom:14, opacity:.3 }}>🎤</div>
-                <p style={{ fontSize:15, color:T.muted, marginBottom:6 }}>No sessions yet</p>
-                <p style={{ fontSize:13, color:T.hint }}>Complete a practice session to see it here</p>
-              </div>
-            ) : (
-              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                {sessions.map(s=>(
-                  <SessionCard key={s.id} s={s} onDelete={deleteSession}/>
-                ))}
-              </div>
-            )}
-          </div>
+            </>
+          ) : (
+            <button onClick={stopSession} disabled={saving} style={{
+              width:72, height:72, borderRadius:"50%",
+              background: saving?"rgba(255,255,255,0.3)":"#fff",
+              border:"none", cursor:"pointer",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              boxShadow:"0 4px 24px rgba(0,0,0,0.4)",
+              transition:"all .2s",
+            }}>
+              <div style={{
+                width:26, height:26, borderRadius:6,
+                background:saving?"rgba(0,0,0,0.3)":"#000",
+              }}/>
+            </button>
+          )}
+        </div>
+
+        {/* Hint text */}
+        {!recording && (
+          <p style={{
+            textAlign:"center", marginTop:14,
+            fontSize:12, color:"rgba(255,255,255,0.35)",
+            letterSpacing:".01em",
+          }}>
+            {camReady ? "Tap to start session" : "Starting camera…"}
+          </p>
         )}
       </div>
 
       <style>{`
-        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
-        @keyframes spin   { to{transform:rotate(360deg)} }
-        @keyframes pulse  { 0%,100%{opacity:.6} 50%{opacity:.3} }
-        * { box-sizing:border-box; margin:0; padding:0; }
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+        *{box-sizing:border-box;margin:0;padding:0;}
+        ::placeholder{color:rgba(255,255,255,0.4);}
       `}</style>
     </div>
   );
