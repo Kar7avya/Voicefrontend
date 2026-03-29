@@ -94,7 +94,6 @@ function ScoreRing({ score, size=120 }) {
 // ── Result card shown after session ──────────────────────────────
 function ResultCard({ data, onClose, onHistory }) {
   if (!data) return null;
-  const col = data.avg_score>=75?"#30d158":data.avg_score>=50?"#ffd60a":"#ff453a";
   return (
     <div style={{
       position:"fixed", inset:0, zIndex:200,
@@ -366,7 +365,7 @@ export default function SpeakWell() {
   const [recording,   setRecording]   = useState(false);
   const [elapsed,     setElapsed]     = useState(0);
   const [analysis,    setAnalysis]    = useState(null);
-  const [scores,      setScores]      = useState([]);
+  const [, setScores]      = useState([]);
   const [mlOn,        setMlOn]        = useState(false);
   const [sessName,    setSessName]    = useState("");
   const [summaryData, setSummaryData] = useState(null);
