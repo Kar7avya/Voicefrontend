@@ -1,16 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
-// ─── AudioVisualizer ──────────────────────────────────────────────────────────
-// Draws a frequency bar chart using MFCC + Mel features
-// extracted by the CNN-LSTM model from the generated audio.
-// These are REAL ML features — not random animations.
-//
-// Props:
-//   audioFeatures — { mfcc[], mel[], rms, zcr, rolloff } from /generate API
-//   isPlaying     — boolean, animates bars when true
-//   language      — string label
-// ─────────────────────────────────────────────────────────────────────────────
 export default function AudioVisualizer({ audioFeatures, isPlaying, language }) {
     const [bars, setBars] = useState([]);
 
@@ -18,27 +8,41 @@ export default function AudioVisualizer({ audioFeatures, isPlaying, language }) 
         if (!audioFeatures) { setBars([]); return; }
 
         const { mfcc = [], mel = [] } = audioFeatures;
-        const mfccSlice = mfcc.slice(0, 32);
-        const melSlice  = mel.slice(0, 32);
 
-        const mfccAbsMax = Math.max(...mfccSlice.map(Math.abs)) || 1;
-        const melMin     = Math.min(...melSlice);
-        const melMax     = Math.max(...melSlice) || 1;
+        // Use MEL spectrogram for bar heights — all positive values, better visual spread
+        // MFCC goes negative which collapses the range when using abs()
+        // Mel values are always positive (energy) — gives natural waveform shape
+        const melFull = mel.slice(0, 40);
 
-        const built = mfccSlice.map((mfccVal, i) => {
-            const melVal      = melSlice[i] ?? 0;
-            const heightRatio = Math.abs(mfccVal) / mfccAbsMax;
-            const colorRatio  = (melVal - melMin) / (melMax - melMin);
+        // Normalize mel to 0–1
+        const melMin = Math.min(...melFull);
+        const melMax = Math.max(...melFull) || 1;
 
-            // Height: 12% min to 100% max
-            const height = 12 + heightRatio * 88;
+        // Use MFCC for color only
+        const mfccFull   = mfcc.slice(0, 40);
+        const mfccAbsMax = Math.max(...mfccFull.map(Math.abs)) || 1;
 
-            // Color: blue (low energy) → purple → pink (high energy)
-            const r = Math.round(100 + colorRatio * 155);
-            const g = Math.round(50  + colorRatio * 10);
-            const b = Math.round(220 - colorRatio * 20);
+        const built = melFull.map((melVal, i) => {
+            const mfccVal    = mfccFull[i] ?? 0;
+            const heightRatio = (melVal - melMin) / (melMax - melMin);
+            const colorRatio  = Math.abs(mfccVal) / mfccAbsMax;
 
-            return { height, color: `rgb(${r},${g},${b})`, raw: mfccVal.toFixed(2), index: i };
+            // Height: 8% to 100% — mel gives natural tall bars
+            const height = 8 + heightRatio * 92;
+
+            // Color gradient: deep blue → violet → pink → coral
+            // based on MFCC energy at that band
+            const r = Math.round(80  + colorRatio * 180);
+            const g = Math.round(30  + colorRatio * 20);
+            const b = Math.round(220 - colorRatio * 80);
+
+            return {
+                height,
+                color: `rgb(${r},${g},${b})`,
+                melRaw:  melVal.toFixed(1),
+                mfccRaw: mfccVal.toFixed(2),
+                index: i,
+            };
         });
 
         setBars(built);
@@ -47,9 +51,9 @@ export default function AudioVisualizer({ audioFeatures, isPlaying, language }) 
     if (!audioFeatures) return null;
 
     const { rms = 0, zcr = 0, rolloff = 0 } = audioFeatures;
-    const loudness  = rms > 0.05 ? "High"   : rms > 0.02 ? "Medium" : "Low";
-    const loudColor = rms > 0.05 ? "#34C759": rms > 0.02 ? "#F59E0B": "#60a5fa";
-    const zcrLabel  = zcr > 0.1  ? "Fast"   : zcr > 0.05 ? "Medium" : "Slow";
+    const loudness  = rms > 0.05 ? "High"    : rms > 0.02 ? "Medium" : "Low";
+    const loudColor = rms > 0.05 ? "#34C759" : rms > 0.02 ? "#F59E0B": "#60a5fa";
+    const zcrLabel  = zcr > 0.1  ? "Fast"    : zcr > 0.05 ? "Medium" : "Slow";
 
     return (
         <motion.div
@@ -73,7 +77,7 @@ export default function AudioVisualizer({ audioFeatures, isPlaying, language }) 
                             CNN-LSTM Audio Fingerprint
                         </p>
                         <p className="text-[9px] leading-none mt-0.5" style={{ color: "#475569" }}>
-                            MFCC features from trained model · {language}
+                            Mel Spectrogram energy · MFCC color · {language}
                         </p>
                     </div>
                 </div>
@@ -90,61 +94,86 @@ export default function AudioVisualizer({ audioFeatures, isPlaying, language }) 
             </div>
 
             {/* Bars */}
-            <div className="px-5 pt-5 pb-2">
+            <div className="px-5 pt-5 pb-1">
                 <p className="text-[9px] uppercase tracking-widest mb-3 font-bold"
                     style={{ color: "#334155" }}>
-                    MFCC Spectrum — 32 frequency bands
+                    Mel Spectrogram — 40 frequency bands
                 </p>
-                <div className="flex items-end gap-[3px]" style={{ height: 80 }}>
+
+                {/* Bar chart */}
+                <div className="flex items-end gap-[2px]" style={{ height: 100 }}>
                     {bars.map((bar, i) => (
                         <motion.div
                             key={i}
-                            className="flex-1 rounded-t-sm"
+                            className="flex-1 rounded-t-[2px]"
                             style={{ backgroundColor: bar.color, minWidth: 2 }}
                             animate={isPlaying ? {
                                 height: [
                                     `${bar.height}%`,
-                                    `${Math.min(100, bar.height * (0.85 + (i % 3) * 0.1))}%`,
+                                    `${Math.max(8, bar.height * (0.75 + (i % 4) * 0.12))}%`,
                                     `${bar.height}%`,
                                 ],
-                            } : { height: `${bar.height}%` }}
+                            } : {
+                                height: `${bar.height}%`,
+                            }}
                             transition={isPlaying ? {
-                                duration: 0.35 + (i % 7) * 0.07,
+                                duration: 0.3 + (i % 7) * 0.06,
                                 repeat: Infinity,
                                 repeatType: "reverse",
                                 ease: "easeInOut",
-                            } : { duration: 0.6 }}
-                            title={`MFCC[${i}] = ${bar.raw}`}
+                            } : {
+                                duration: 0.7,
+                                ease: "easeOut",
+                            }}
+                            title={`Band ${i} · Mel=${bar.melRaw} · MFCC=${bar.mfccRaw}`}
                         />
                     ))}
                 </div>
-                <div className="flex justify-between mt-1.5">
-                    <span className="text-[8px]" style={{ color: "#1e293b" }}>Low freq</span>
-                    <span className="text-[8px]" style={{ color: "#1e293b" }}>Mid freq</span>
-                    <span className="text-[8px]" style={{ color: "#1e293b" }}>High freq</span>
+
+                {/* X-axis */}
+                <div className="flex justify-between mt-1.5 mb-4">
+                    <span className="text-[8px]" style={{ color: "#334155" }}>Low freq</span>
+                    <span className="text-[8px]" style={{ color: "#334155" }}>Mid freq</span>
+                    <span className="text-[8px]" style={{ color: "#334155" }}>High freq</span>
                 </div>
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 mx-5 mb-4 mt-3 rounded-xl overflow-hidden"
+            <div className="grid grid-cols-3 mx-5 mb-4 rounded-xl overflow-hidden"
                 style={{ border: "1px solid #1e293b" }}>
 
                 <div className="px-3 py-2.5 text-center" style={{ backgroundColor: "#0d1424" }}>
-                    <p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: "#334155" }}>Loudness</p>
+                    <p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: "#334155" }}>
+                        Loudness
+                    </p>
                     <p className="text-sm font-bold" style={{ color: loudColor }}>{loudness}</p>
-                    <p className="text-[8px] font-mono mt-0.5" style={{ color: "#334155" }}>RMS {rms.toFixed(4)}</p>
+                    <p className="text-[8px] font-mono mt-0.5" style={{ color: "#1e3a5f" }}>
+                        RMS {rms.toFixed(4)}
+                    </p>
                 </div>
 
                 <div className="px-3 py-2.5 text-center"
-                    style={{ backgroundColor: "#0d1424", borderLeft: "1px solid #1e293b", borderRight: "1px solid #1e293b" }}>
-                    <p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: "#334155" }}>Wave speed</p>
+                    style={{
+                        backgroundColor: "#0d1424",
+                        borderLeft:  "1px solid #1e293b",
+                        borderRight: "1px solid #1e293b",
+                    }}>
+                    <p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: "#334155" }}>
+                        Wave speed
+                    </p>
                     <p className="text-sm font-bold" style={{ color: "#a78bfa" }}>{zcrLabel}</p>
-                    <p className="text-[8px] font-mono mt-0.5" style={{ color: "#334155" }}>ZCR {zcr.toFixed(4)}</p>
+                    <p className="text-[8px] font-mono mt-0.5" style={{ color: "#334155" }}>
+                        ZCR {zcr.toFixed(4)}
+                    </p>
                 </div>
 
                 <div className="px-3 py-2.5 text-center" style={{ backgroundColor: "#0d1424" }}>
-                    <p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: "#334155" }}>Freq ceiling</p>
-                    <p className="text-sm font-bold" style={{ color: "#38bdf8" }}>{(rolloff / 1000).toFixed(1)} kHz</p>
+                    <p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: "#334155" }}>
+                        Freq ceiling
+                    </p>
+                    <p className="text-sm font-bold" style={{ color: "#38bdf8" }}>
+                        {(rolloff / 1000).toFixed(1)} kHz
+                    </p>
                     <p className="text-[8px] font-mono mt-0.5" style={{ color: "#334155" }}>Rolloff</p>
                 </div>
 
@@ -155,8 +184,8 @@ export default function AudioVisualizer({ audioFeatures, isPlaying, language }) 
                 style={{ backgroundColor: "#0d1424", border: "1px solid #1e293b" }}>
                 <span style={{ fontSize: 11, marginTop: 1 }}>🧠</span>
                 <p className="text-[9px] leading-relaxed" style={{ color: "#475569" }}>
-                    Bar heights = 32 MFCC coefficients · Bar colors = Mel Spectrogram energy.
-                    Extracted by CNN-LSTM model from generated audio — real acoustic fingerprint, not animation.
+                    Bar height = Mel Spectrogram energy per band (always positive, natural waveform shape).
+                    Bar color = MFCC coefficient intensity. Both extracted by CNN-LSTM from generated audio.
                 </p>
             </div>
 
