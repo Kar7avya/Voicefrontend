@@ -65,7 +65,6 @@ function ScoreRing({ score, size=120 }) {
 // ── Deep Result Modal ─────────────────────────────────────────────
 function DeepResultModal({ data, onClose, onHistory }) {
   if (!data) return null;
-  const col = data.avg_score>=75?"#30d158":data.avg_score>=50?"#ffd60a":"#ff453a";
   const m   = data.metrics || {};
 
   const MetricBox = ({ label, value, unit="" }) => (
