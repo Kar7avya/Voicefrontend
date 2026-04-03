@@ -32,68 +32,89 @@ const PLACEHOLDERS = [
 const CNNLSTMBadge = ({ verification }) => {
     if (!verification) return null;
     const { detected_language, confidence, match, expected, top3 } = verification;
+    const matchBg      = match ? "#f0fdf4" : "#fffbeb";
+    const matchBorder  = match ? "#86efac" : "#fcd34d";
+    const matchColor   = match ? "#15803d" : "#b45309";
+    const matchBadgeBg = match ? "#dcfce7" : "#fef3c7";
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 12, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className={`rounded-2xl border overflow-hidden ${match ? "bg-emerald-500/8 border-emerald-500/25" : "bg-amber-500/8 border-amber-500/25"}`}
+            style={{ backgroundColor: matchBg, border: `1.5px solid ${matchBorder}`, borderRadius: 16, overflow: "hidden" }}
         >
-            <div className={`flex items-center justify-between px-5 py-3 border-b ${match ? "border-emerald-500/15 bg-emerald-500/5" : "border-amber-500/15 bg-amber-500/5"}`}>
-                <div className="flex items-center gap-2">
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${match ? "bg-emerald-500/20" : "bg-amber-500/20"}`}>
-                        <Brain size={14} className={match ? "text-emerald-400" : "text-amber-400"} />
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: `1px solid ${matchBorder}`, backgroundColor: match ? "#dcfce7" : "#fef3c7" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: matchBadgeBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Brain size={15} style={{ color: matchColor }} />
                     </div>
                     <div>
-                        <span className="text-[11px] font-bold text-white/80 tracking-wide">CNN-LSTM Verification</span>
-                        <p className="text-[9px] text-white/40 leading-none mt-0.5">87.5% trained model · 10,013 audio samples</p>
+                        <p style={{ fontSize: 11, fontWeight: 700, color: "#111827", letterSpacing: "0.05em" }}>CNN-LSTM Verification</p>
+                        <p style={{ fontSize: 9, color: "#6b7280", marginTop: 2 }}>87.5% trained model · 10,013 audio samples</p>
                     </div>
                 </div>
-                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold ${match ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20" : "bg-amber-500/15 text-amber-400 border border-amber-500/20"}`}>
+                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 999, backgroundColor: matchBadgeBg, border: `1px solid ${matchBorder}`, fontSize: 10, fontWeight: 700, color: matchColor }}>
                     {match ? <><Check size={10} /> Verified</> : <><AlertTriangle size={10} /> Mismatch</>}
                 </div>
             </div>
-            <div className="px-5 py-4 space-y-4">
+
+            {/* Body */}
+            <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+
+                {/* Detected language + confidence */}
                 <div>
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Detected</span>
-                            <span className="text-sm font-bold text-white">{detected_language}</span>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.1em" }}>Detected</span>
+                            <span style={{ fontSize: 15, fontWeight: 800, color: "#111827" }}>{detected_language}</span>
                             {match
-                                ? <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-bold">✓ matches selected</span>
-                                : <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 font-bold">expected {expected}</span>
+                                ? <span style={{ fontSize: 9, padding: "2px 8px", borderRadius: 999, backgroundColor: "#dcfce7", color: "#15803d", border: "1px solid #86efac", fontWeight: 700 }}>✓ matches selected</span>
+                                : <span style={{ fontSize: 9, padding: "2px 8px", borderRadius: 999, backgroundColor: "#fef3c7", color: "#b45309", border: "1px solid #fcd34d", fontWeight: 700 }}>expected {expected}</span>
                             }
                         </div>
-                        <span className={`text-lg font-black font-mono ${confidence > 90 ? "text-emerald-400" : confidence > 70 ? "text-amber-400" : "text-red-400"}`}>
+                        <span style={{ fontSize: 20, fontWeight: 900, fontFamily: "monospace", color: matchColor }}>
                             {confidence.toFixed(1)}%
                         </span>
                     </div>
-                    <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                    {/* Progress bar */}
+                    <div style={{ height: 8, backgroundColor: "#e5e7eb", borderRadius: 999, overflow: "hidden" }}>
                         <motion.div
-                            className={`h-full rounded-full ${match ? "bg-gradient-to-r from-emerald-500 to-emerald-400" : "bg-gradient-to-r from-amber-500 to-amber-400"}`}
+                            style={{ height: "100%", borderRadius: 999, backgroundColor: matchColor }}
                             initial={{ width: 0 }} animate={{ width: `${confidence}%` }}
                             transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
                         />
                     </div>
                 </div>
+
+                {/* Top 3 */}
                 {top3 && (
                     <div>
-                        <span className="text-[9px] uppercase tracking-widest text-white/30 font-bold block mb-2">Top 3 Predictions</span>
-                        <div className="grid grid-cols-3 gap-2">
+                        <p style={{ fontSize: 9, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Top 3 Predictions</p>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                             {top3.map((item, i) => (
-                                <div key={i} className={`p-2.5 rounded-xl text-center border ${i === 0 ? match ? "bg-emerald-500/10 border-emerald-500/20" : "bg-amber-500/10 border-amber-500/20" : "bg-white/3 border-white/5"}`}>
-                                    <div className={`text-[9px] font-bold mb-0.5 ${i === 0 ? match ? "text-emerald-400" : "text-amber-400" : "text-white/30"}`}>#{i + 1}</div>
-                                    <div className="text-xs font-bold text-white truncate">{item.language}</div>
-                                    <div className={`text-[10px] font-mono font-bold ${i === 0 ? match ? "text-emerald-400" : "text-amber-400" : "text-white/40"}`}>{item.confidence}%</div>
+                                <div key={i} style={{
+                                    padding: "10px 8px",
+                                    borderRadius: 12,
+                                    textAlign: "center",
+                                    backgroundColor: i === 0 ? matchBadgeBg : "#f3f4f6",
+                                    border: `1px solid ${i === 0 ? matchBorder : "#e5e7eb"}`,
+                                }}>
+                                    <p style={{ fontSize: 9, fontWeight: 700, color: i === 0 ? matchColor : "#9ca3af", marginBottom: 3 }}>#{i + 1}</p>
+                                    <p style={{ fontSize: 11, fontWeight: 800, color: "#111827" }}>{item.language}</p>
+                                    <p style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: i === 0 ? matchColor : "#6b7280" }}>{item.confidence}%</p>
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
-                <div className="flex items-start gap-2 p-3 rounded-xl bg-white/3 border border-white/5">
-                    <Shield size={12} className="text-white/30 mt-0.5 shrink-0" />
-                    <p className="text-[10px] text-white/40 leading-relaxed">
+
+                {/* Footer note */}
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", borderRadius: 10, backgroundColor: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                    <Shield size={12} style={{ color: "#9ca3af", marginTop: 1, flexShrink: 0 }} />
+                    <p style={{ fontSize: 10, color: "#4b5563", lineHeight: 1.6 }}>
                         {match
                             ? `CNN-LSTM confirmed the generated audio sounds like ${detected_language} with ${confidence.toFixed(0)}% confidence — validating Edge TTS output quality.`
                             : `CNN-LSTM detected ${detected_language} instead of ${expected}. This may indicate acoustic overlap between languages.`}
@@ -488,7 +509,7 @@ const SmartTTS = () => {
                                 {verification && <CNNLSTMBadge verification={verification} />}
                             </AnimatePresence>
 
-                            {/* ── Audio Visualizer — MFCC features from CNN-LSTM ── */}
+                            {/* ── Audio Visualizer — live FFT + CNN-LSTM Mel features ── */}
                             <AnimatePresence>
                                 {audioFeatures && (
                                     <motion.div
@@ -498,6 +519,7 @@ const SmartTTS = () => {
                                         transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
                                     >
                                         <AudioVisualizer
+                                            audioRef={audioRef}
                                             audioFeatures={audioFeatures}
                                             isPlaying={isPlaying}
                                             language={LANGUAGES.find(l => l.id === activeLang)?.name}

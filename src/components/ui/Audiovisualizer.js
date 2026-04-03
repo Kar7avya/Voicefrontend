@@ -1,58 +1,153 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 
-export default function AudioVisualizer({ audioFeatures, isPlaying, language }) {
-    const [bars, setBars] = useState([]);
+// ─── AudioVisualizer ──────────────────────────────────────────────────────────
+// Shows the frequency spectrum of the generated audio in real time.
+//
+// How it works:
+//   1. When audio plays → Web Audio API reads live FFT frequencies (256 bands)
+//   2. These are REAL frequency values from the actual audio signal
+//   3. When paused → falls back to ML features (Mel Spectrogram from CNN-LSTM)
+//   4. Both views show the acoustic fingerprint of the generated voice
+//
+// Props:
+//   audioRef      — ref to the <audio> element in SmartTTS.js
+//   audioFeatures — { mfcc[], mel[], rms, zcr, rolloff } from /generate API
+//   isPlaying     — boolean
+//   language      — string
+// ─────────────────────────────────────────────────────────────────────────────
+export default function AudioVisualizer({ audioRef, audioFeatures, isPlaying, language }) {
+    const canvasRef      = useRef(null);
+    const animFrameRef   = useRef(null);
+    const analyserRef    = useRef(null);
+    const sourceRef      = useRef(null);
+    const audioCtxRef    = useRef(null);
+    const dataArrayRef   = useRef(null);
+    const [ready, setReady] = useState(false);
+    const [mode,  setMode]  = useState("ml"); // "live" | "ml"
 
+    // ── Build Web Audio API analyser once ────────────────────────────────────
+    const setupAudioContext = useCallback(() => {
+        if (analyserRef.current) return;
+        const audio = audioRef?.current;
+        if (!audio) return;
+
+        try {
+            const ctx      = new (window.AudioContext || window.webkitAudioContext)();
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize          = 512;   // 256 frequency bins
+            analyser.smoothingTimeConstant = 0.8;
+
+            const source = ctx.createMediaElementSource(audio);
+            source.connect(analyser);
+            analyser.connect(ctx.destination);
+
+            audioCtxRef.current  = ctx;
+            analyserRef.current  = analyser;
+            sourceRef.current    = source;
+            dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
+            setReady(true);
+        } catch (e) {
+            console.warn("Web Audio API setup failed:", e);
+        }
+    }, [audioRef]);
+
+    // ── Draw loop ─────────────────────────────────────────────────────────────
+    const draw = useCallback(() => {
+        const canvas   = canvasRef.current;
+        const analyser = analyserRef.current;
+        const dataArr  = dataArrayRef.current;
+        if (!canvas) return;
+
+        const ctx = canvas.getContext("2d");
+        const W   = canvas.width;
+        const H   = canvas.height;
+
+        ctx.clearRect(0, 0, W, H);
+
+        if (analyser && dataArr && isPlaying) {
+            // ── LIVE mode — real FFT from Web Audio API ──
+            analyser.getByteFrequencyData(dataArr);
+            setMode("live");
+
+            const barCount = 40;
+            const step     = Math.floor(dataArr.length / barCount);
+            const barW     = W / barCount;
+
+            for (let i = 0; i < barCount; i++) {
+                // Average a small band of FFT bins for each bar
+                let sum = 0;
+                for (let j = 0; j < step; j++) {
+                    sum += dataArr[i * step + j];
+                }
+                const avg     = sum / step;
+                const barH    = (avg / 255) * H;
+                const colorRatio = i / barCount;
+
+                // Color: deep blue → violet → pink
+                const r = Math.round(80  + colorRatio * 180);
+                const g = Math.round(30  + colorRatio * 20);
+                const b = Math.round(220 - colorRatio * 80);
+
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.beginPath();
+                ctx.roundRect(i * barW + 1, H - barH, barW - 2, barH, 2);
+                ctx.fill();
+            }
+        } else if (audioFeatures?.mel) {
+            // ── ML mode — Mel Spectrogram from CNN-LSTM ──
+            setMode("ml");
+            const mel    = audioFeatures.mel.slice(0, 40);
+            const melMin = Math.min(...mel);
+            const melMax = Math.max(...mel) || 1;
+            const barW   = W / mel.length;
+
+            mel.forEach((val, i) => {
+                const ratio    = (val - melMin) / (melMax - melMin);
+                const barH     = 8 + ratio * (H - 8);
+                const colorRatio = i / mel.length;
+
+                const r = Math.round(80  + colorRatio * 180);
+                const g = Math.round(30  + colorRatio * 20);
+                const b = Math.round(220 - colorRatio * 80);
+
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.beginPath();
+                ctx.roundRect(i * barW + 1, H - barH, barW - 2, barH, 2);
+                ctx.fill();
+            });
+        }
+
+        animFrameRef.current = requestAnimationFrame(draw);
+    }, [isPlaying, audioFeatures]);
+
+    // ── Start / stop animation ────────────────────────────────────────────────
     useEffect(() => {
-        if (!audioFeatures) { setBars([]); return; }
+        if (isPlaying) {
+            setupAudioContext();
+            // Resume AudioContext if suspended (browser autoplay policy)
+            if (audioCtxRef.current?.state === "suspended") {
+                audioCtxRef.current.resume();
+            }
+        }
+        animFrameRef.current = requestAnimationFrame(draw);
+        return () => {
+            if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+        };
+    }, [isPlaying, draw, setupAudioContext, audioFeatures]);
 
-        const { mfcc = [], mel = [] } = audioFeatures;
-
-        // Use MEL spectrogram for bar heights — all positive values, better visual spread
-        // MFCC goes negative which collapses the range when using abs()
-        // Mel values are always positive (energy) — gives natural waveform shape
-        const melFull = mel.slice(0, 40);
-
-        // Normalize mel to 0–1
-        const melMin = Math.min(...melFull);
-        const melMax = Math.max(...melFull) || 1;
-
-        // Use MFCC for color only
-        const mfccFull   = mfcc.slice(0, 40);
-        const mfccAbsMax = Math.max(...mfccFull.map(Math.abs)) || 1;
-
-        const built = melFull.map((melVal, i) => {
-            const mfccVal    = mfccFull[i] ?? 0;
-            const heightRatio = (melVal - melMin) / (melMax - melMin);
-            const colorRatio  = Math.abs(mfccVal) / mfccAbsMax;
-
-            // Height: 8% to 100% — mel gives natural tall bars
-            const height = 8 + heightRatio * 92;
-
-            // Color gradient: deep blue → violet → pink → coral
-            // based on MFCC energy at that band
-            const r = Math.round(80  + colorRatio * 180);
-            const g = Math.round(30  + colorRatio * 20);
-            const b = Math.round(220 - colorRatio * 80);
-
-            return {
-                height,
-                color: `rgb(${r},${g},${b})`,
-                melRaw:  melVal.toFixed(1),
-                mfccRaw: mfccVal.toFixed(2),
-                index: i,
-            };
-        });
-
-        setBars(built);
-    }, [audioFeatures]);
+    // ── Cleanup on unmount ────────────────────────────────────────────────────
+    useEffect(() => {
+        return () => {
+            if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+        };
+    }, []);
 
     if (!audioFeatures) return null;
 
     const { rms = 0, zcr = 0, rolloff = 0 } = audioFeatures;
     const loudness  = rms > 0.05 ? "High"    : rms > 0.02 ? "Medium" : "Low";
-    const loudColor = rms > 0.05 ? "#34C759" : rms > 0.02 ? "#F59E0B": "#60a5fa";
+    const loudColor = rms > 0.05 ? "#15803d" : rms > 0.02 ? "#b45309" : "#1d4ed8";
     const zcrLabel  = zcr > 0.1  ? "Fast"    : zcr > 0.05 ? "Medium" : "Slow";
 
     return (
@@ -61,131 +156,109 @@ export default function AudioVisualizer({ audioFeatures, isPlaying, language }) 
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
-            className="rounded-2xl border overflow-hidden"
-            style={{ backgroundColor: "#0a0f1e", borderColor: "#7C3AED33" }}
+            style={{
+                borderRadius: 16,
+                border: "1.5px solid #e0d7f5",
+                overflow: "hidden",
+                backgroundColor: "#f8f5ff",
+            }}
         >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b"
-                style={{ borderColor: "#7C3AED22", backgroundColor: "#7C3AED08" }}>
-                <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                        style={{ backgroundColor: "#7C3AED30" }}>
+            <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "10px 18px",
+                borderBottom: "1px solid #e0d7f5",
+                backgroundColor: "#ede9fe",
+            }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: "#ddd6fe", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <span style={{ fontSize: 14 }}>📊</span>
                     </div>
                     <div>
-                        <p className="text-[11px] font-bold tracking-wide" style={{ color: "#e2e8f0" }}>
-                            CNN-LSTM Audio Fingerprint
+                        <p style={{ fontSize: 11, fontWeight: 700, color: "#3730a3", letterSpacing: "0.04em" }}>
+                            Frequency Spectrum
                         </p>
-                        <p className="text-[9px] leading-none mt-0.5" style={{ color: "#475569" }}>
-                            Mel Spectrogram energy · MFCC color · {language}
+                        <p style={{ fontSize: 9, color: "#7c3aed", marginTop: 1 }}>
+                            {isPlaying && mode === "live"
+                                ? "🔴 Live — Web Audio API real-time FFT"
+                                : "CNN-LSTM Mel Spectrogram · " + language}
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold"
-                    style={{
-                        backgroundColor: isPlaying ? "#34C75920" : "#1e293b",
-                        color:           isPlaying ? "#34C759"   : "#475569",
-                        border:         `1px solid ${isPlaying ? "#34C75940" : "#1e293b"}`,
-                    }}>
-                    <span className="w-1.5 h-1.5 rounded-full"
-                        style={{ backgroundColor: isPlaying ? "#34C759" : "#475569" }} />
-                    {isPlaying ? "Live" : "Ready"}
+                <div style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    padding: "4px 10px", borderRadius: 999,
+                    backgroundColor: isPlaying ? "#dcfce7" : "#ede9fe",
+                    border: `1px solid ${isPlaying ? "#86efac" : "#c4b5fd"}`,
+                    fontSize: 9, fontWeight: 700,
+                    color: isPlaying ? "#15803d" : "#7c3aed",
+                }}>
+                    <span style={{
+                        width: 6, height: 6, borderRadius: "50%",
+                        backgroundColor: isPlaying ? "#16a34a" : "#7c3aed",
+                        display: "inline-block",
+                        animation: isPlaying ? "pulse 1s infinite" : "none",
+                    }} />
+                    {isPlaying ? "Live" : "Static"}
                 </div>
             </div>
 
-            {/* Bars */}
-            <div className="px-5 pt-5 pb-1">
-                <p className="text-[9px] uppercase tracking-widest mb-3 font-bold"
-                    style={{ color: "#334155" }}>
-                    Mel Spectrogram — 40 frequency bands
+            {/* Canvas — frequency bars drawn here */}
+            <div style={{ padding: "16px 18px 4px" }}>
+                <p style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 8 }}>
+                    {isPlaying && mode === "live" ? "Real-time FFT — 40 bands" : "Mel Spectrogram — 40 bands"}
                 </p>
-
-                {/* Bar chart */}
-                <div className="flex items-end gap-[2px]" style={{ height: 100 }}>
-                    {bars.map((bar, i) => (
-                        <motion.div
-                            key={i}
-                            className="flex-1 rounded-t-[2px]"
-                            style={{ backgroundColor: bar.color, minWidth: 2 }}
-                            animate={isPlaying ? {
-                                height: [
-                                    `${bar.height}%`,
-                                    `${Math.max(8, bar.height * (0.75 + (i % 4) * 0.12))}%`,
-                                    `${bar.height}%`,
-                                ],
-                            } : {
-                                height: `${bar.height}%`,
-                            }}
-                            transition={isPlaying ? {
-                                duration: 0.3 + (i % 7) * 0.06,
-                                repeat: Infinity,
-                                repeatType: "reverse",
-                                ease: "easeInOut",
-                            } : {
-                                duration: 0.7,
-                                ease: "easeOut",
-                            }}
-                            title={`Band ${i} · Mel=${bar.melRaw} · MFCC=${bar.mfccRaw}`}
-                        />
-                    ))}
-                </div>
-
-                {/* X-axis */}
-                <div className="flex justify-between mt-1.5 mb-4">
-                    <span className="text-[8px]" style={{ color: "#334155" }}>Low freq</span>
-                    <span className="text-[8px]" style={{ color: "#334155" }}>Mid freq</span>
-                    <span className="text-[8px]" style={{ color: "#334155" }}>High freq</span>
+                <canvas
+                    ref={canvasRef}
+                    width={560}
+                    height={100}
+                    style={{ width: "100%", height: 100, display: "block" }}
+                />
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, marginBottom: 12 }}>
+                    <span style={{ fontSize: 8, color: "#a78bfa" }}>Low freq</span>
+                    <span style={{ fontSize: 8, color: "#a78bfa" }}>Mid freq</span>
+                    <span style={{ fontSize: 8, color: "#a78bfa" }}>High freq</span>
                 </div>
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 mx-5 mb-4 rounded-xl overflow-hidden"
-                style={{ border: "1px solid #1e293b" }}>
-
-                <div className="px-3 py-2.5 text-center" style={{ backgroundColor: "#0d1424" }}>
-                    <p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: "#334155" }}>
-                        Loudness
-                    </p>
-                    <p className="text-sm font-bold" style={{ color: loudColor }}>{loudness}</p>
-                    <p className="text-[8px] font-mono mt-0.5" style={{ color: "#1e3a5f" }}>
-                        RMS {rms.toFixed(4)}
-                    </p>
+            <div style={{
+                display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
+                margin: "0 18px 16px",
+                borderRadius: 12, overflow: "hidden",
+                border: "1px solid #e0d7f5",
+            }}>
+                <div style={{ padding: "10px 8px", textAlign: "center", backgroundColor: "#faf5ff" }}>
+                    <p style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Loudness</p>
+                    <p style={{ fontSize: 14, fontWeight: 800, color: loudColor }}>{loudness}</p>
+                    <p style={{ fontSize: 8, fontFamily: "monospace", color: "#9ca3af", marginTop: 2 }}>RMS {rms.toFixed(4)}</p>
                 </div>
-
-                <div className="px-3 py-2.5 text-center"
-                    style={{
-                        backgroundColor: "#0d1424",
-                        borderLeft:  "1px solid #1e293b",
-                        borderRight: "1px solid #1e293b",
-                    }}>
-                    <p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: "#334155" }}>
-                        Wave speed
-                    </p>
-                    <p className="text-sm font-bold" style={{ color: "#a78bfa" }}>{zcrLabel}</p>
-                    <p className="text-[8px] font-mono mt-0.5" style={{ color: "#334155" }}>
-                        ZCR {zcr.toFixed(4)}
-                    </p>
+                <div style={{ padding: "10px 8px", textAlign: "center", backgroundColor: "#faf5ff", borderLeft: "1px solid #e0d7f5", borderRight: "1px solid #e0d7f5" }}>
+                    <p style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Wave speed</p>
+                    <p style={{ fontSize: 14, fontWeight: 800, color: "#6d28d9" }}>{zcrLabel}</p>
+                    <p style={{ fontSize: 8, fontFamily: "monospace", color: "#9ca3af", marginTop: 2 }}>ZCR {zcr.toFixed(4)}</p>
                 </div>
-
-                <div className="px-3 py-2.5 text-center" style={{ backgroundColor: "#0d1424" }}>
-                    <p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: "#334155" }}>
-                        Freq ceiling
-                    </p>
-                    <p className="text-sm font-bold" style={{ color: "#38bdf8" }}>
-                        {(rolloff / 1000).toFixed(1)} kHz
-                    </p>
-                    <p className="text-[8px] font-mono mt-0.5" style={{ color: "#334155" }}>Rolloff</p>
+                <div style={{ padding: "10px 8px", textAlign: "center", backgroundColor: "#faf5ff" }}>
+                    <p style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Freq ceiling</p>
+                    <p style={{ fontSize: 14, fontWeight: 800, color: "#1d4ed8" }}>{(rolloff / 1000).toFixed(1)} kHz</p>
+                    <p style={{ fontSize: 8, fontFamily: "monospace", color: "#9ca3af", marginTop: 2 }}>Rolloff</p>
                 </div>
-
             </div>
 
             {/* Footer */}
-            <div className="mx-5 mb-4 px-3 py-2.5 rounded-xl flex items-start gap-2"
-                style={{ backgroundColor: "#0d1424", border: "1px solid #1e293b" }}>
+            <div style={{
+                margin: "0 18px 16px",
+                padding: "10px 12px",
+                borderRadius: 10,
+                backgroundColor: "#ede9fe",
+                border: "1px solid #c4b5fd",
+                display: "flex", alignItems: "flex-start", gap: 8,
+            }}>
                 <span style={{ fontSize: 11, marginTop: 1 }}>🧠</span>
-                <p className="text-[9px] leading-relaxed" style={{ color: "#475569" }}>
-                    Bar height = Mel Spectrogram energy per band (always positive, natural waveform shape).
-                    Bar color = MFCC coefficient intensity. Both extracted by CNN-LSTM from generated audio.
+                <p style={{ fontSize: 9, color: "#4c1d95", lineHeight: 1.6 }}>
+                    {isPlaying && mode === "live"
+                        ? "Live FFT from Web Audio API — real frequency data from the audio signal as it plays."
+                        : "Mel Spectrogram extracted by CNN-LSTM model from generated audio — real acoustic fingerprint, not animation."}
                 </p>
             </div>
 
