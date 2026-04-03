@@ -519,6 +519,7 @@ const SmartTTS = () => {
                                         transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
                                     >
                                         <AudioVisualizer
+                                            audioURL={audioURL}
                                             audioFeatures={audioFeatures}
                                             isPlaying={isPlaying}
                                             language={LANGUAGES.find(l => l.id === activeLang)?.name}
