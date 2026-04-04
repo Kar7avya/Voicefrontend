@@ -1,68 +1,66 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 
-// ── Cooley-Tukey radix-2 FFT ──────────────────────────────────────────────────
 function fftMags(signal) {
     const N  = signal.length;
     const re = new Float32Array(N);
     const im = new Float32Array(N);
-    // Hann window + copy
     for (let i = 0; i < N; i++) {
         re[i] = signal[i] * 0.5 * (1 - Math.cos((2 * Math.PI * i) / (N - 1)));
     }
-    // Bit-reversal
     for (let i = 1, j = 0; i < N; i++) {
         let bit = N >> 1;
         for (; j & bit; bit >>= 1) j ^= bit;
         j ^= bit;
-        if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; }
+        if (i < j) {
+            [re[i], re[j]] = [re[j], re[i]];
+            [im[i], im[j]] = [im[j], im[i]];
+        }
     }
-    // Butterfly
     for (let len = 2; len <= N; len <<= 1) {
         const ang = (-2 * Math.PI) / len;
-        const wRe = Math.cos(ang), wIm = Math.sin(ang);
+        const wR = Math.cos(ang), wI = Math.sin(ang);
         for (let i = 0; i < N; i += len) {
-            let cRe = 1, cIm = 0;
+            let cR = 1, cI = 0;
             for (let j = 0; j < len / 2; j++) {
                 const uR = re[i+j], uI = im[i+j];
-                const vR = re[i+j+len/2]*cRe - im[i+j+len/2]*cIm;
-                const vI = re[i+j+len/2]*cIm + im[i+j+len/2]*cRe;
+                const vR = re[i+j+len/2]*cR - im[i+j+len/2]*cI;
+                const vI = re[i+j+len/2]*cI + im[i+j+len/2]*cR;
                 re[i+j] = uR+vR; im[i+j] = uI+vI;
                 re[i+j+len/2] = uR-vR; im[i+j+len/2] = uI-vI;
-                [cRe, cIm] = [cRe*wRe - cIm*wIm, cRe*wIm + cIm*wRe];
+                [cR, cI] = [cR*wR - cI*wI, cR*wI + cI*wR];
             }
         }
     }
-    const mags = new Float32Array(N/2);
-    for (let i = 0; i < N/2; i++) mags[i] = Math.sqrt(re[i]*re[i] + im[i]*im[i]) / N;
+    const mags = new Float32Array(N / 2);
+    let mx = 0;
+    for (let i = 0; i < N / 2; i++) {
+        mags[i] = Math.sqrt(re[i]*re[i] + im[i]*im[i]) / N;
+        if (mags[i] > mx) mx = mags[i];
+    }
+    if (mx > 0) for (let i = 0; i < N / 2; i++) mags[i] /= mx;
     return mags;
 }
 
-const WAVEFORM_POINTS = 600; // resolution of waveform line
-const FFT_SIZE        = 1024;
-const NUM_BARS        = 48;
+const WINDOW_SEC = 1.0;
+const FFT_SIZE   = 512;
+const NUM_BARS   = 48;
 
 export default function AudioVisualizer({
     audioURL, audioFeatures, isPlaying, currentTime, duration, language
 }) {
-    const waveCanvasRef = useRef(null); // waveform line graph
-    const fftCanvasRef  = useRef(null); // frequency bars
-    const waveAnimRef   = useRef(null);
-    const fftAnimRef    = useRef(null);
+    const waveRef  = useRef(null);
+    const fftRef   = useRef(null);
+    const wAnimRef = useRef(null);
+    const fAnimRef = useRef(null);
+    const pcmRef   = useRef(null);
+    const srRef    = useRef(22050);
+    const [status, setStatus] = useState("idle");
+    const [tab,    setTab]    = useState("waveform");
 
-    // Pre-computed data
-    const pcmRef      = useRef(null);   // full raw PCM array
-    const fftFrames   = useRef([]);     // FFT frames
-    const srRef       = useRef(22050);
-
-    const [status,   setStatus]   = useState("idle");
-    const [tab,      setTab]      = useState("waveform"); // "waveform" | "spectrum"
-
-    // ── Decode audio once ─────────────────────────────────────────────────────
     useEffect(() => {
         if (!audioURL) return;
-        pcmRef.current    = null;
-        fftFrames.current = [];
+        pcmRef.current = null;
         setStatus("loading");
 
         const run = async () => {
@@ -73,45 +71,21 @@ export default function AudioVisualizer({
                 const tmpCtx  = new (window.AudioContext || window.webkitAudioContext)();
                 const decoded = await tmpCtx.decodeAudioData(buf);
                 await tmpCtx.close();
-
-                const sr  = decoded.sampleRate;
-                const pcm = decoded.getChannelData(0);
-                srRef.current  = sr;
-                pcmRef.current = pcm;
-
-                // Pre-compute FFT frames at 60fps
-                const hopSize = Math.floor(sr / 60);
-                const frames  = [];
-                for (let s = 0; s + FFT_SIZE <= pcm.length; s += hopSize) {
-                    const slice = pcm.slice(s, s + FFT_SIZE);
-                    const mags  = fftMags(slice);
-                    // Group into NUM_BARS log-scale
-                    const bars  = new Float32Array(NUM_BARS);
-                    const step  = Math.floor(mags.length / NUM_BARS);
-                    let   mx    = 0;
-                    for (let b = 0; b < NUM_BARS; b++) {
-                        let sum = 0;
-                        for (let j = 0; j < step; j++) sum += mags[b*step+j];
-                        bars[b] = sum / step;
-                        if (bars[b] > mx) mx = bars[b];
-                    }
-                    if (mx > 0) for (let b = 0; b < NUM_BARS; b++) bars[b] /= mx;
-                    frames.push(bars);
-                }
-                fftFrames.current = frames;
+                srRef.current  = decoded.sampleRate;
+                pcmRef.current = decoded.getChannelData(0);
                 setStatus("ready");
             } catch (e) {
-                console.warn("AudioVisualizer error:", e.message);
+                console.warn("AudioVisualizer:", e.message);
                 setStatus("error");
             }
         };
         run();
     }, [audioURL]);
 
-    // ── WAVEFORM draw loop ────────────────────────────────────────────────────
+    // ── Waveform draw ─────────────────────────────────────────────────────────
     useEffect(() => {
-        const canvas = waveCanvasRef.current;
-        if (!canvas) return;
+        const canvas = waveRef.current;
+        if (!canvas || tab !== "waveform") return;
 
         const draw = () => {
             const ctx = canvas.getContext("2d");
@@ -120,135 +94,117 @@ export default function AudioVisualizer({
             const mid = H / 2;
             ctx.clearRect(0, 0, W, H);
 
-            // Background
             ctx.fillStyle = "#f3f0ff";
             ctx.fillRect(0, 0, W, H);
 
+            // Grid lines
+            ctx.strokeStyle = "rgba(124,58,237,0.12)";
+            ctx.lineWidth   = 0.5;
+            for (let g = -4; g <= 4; g++) {
+                if (g === 0) continue;
+                const y = mid - (g / 5) * (mid - 8);
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+            }
+
             // Zero line
-            ctx.strokeStyle = "#c4b5fd";
+            ctx.strokeStyle = "rgba(124,58,237,0.35)";
             ctx.lineWidth   = 1;
             ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            ctx.moveTo(0, mid);
-            ctx.lineTo(W, mid);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke();
             ctx.setLineDash([]);
 
             const pcm = pcmRef.current;
+            const sr  = srRef.current;
 
             if (pcm && status === "ready" && duration > 0) {
-                const sr         = srRef.current;
-                const totalSamp  = pcm.length;
-                const windowSec  = Math.min(duration, 2.0); // show 2 seconds window
-                const halfWin    = windowSec / 2;
+                const half  = WINDOW_SEC / 2;
+                const startT = Math.max(0, currentTime - half);
+                const endT   = Math.min(duration, currentTime + half);
+                const s0     = Math.floor(startT * sr);
+                const sN     = Math.floor(endT * sr);
+                const range  = Math.max(1, sN - s0);
+                const total  = pcm.length;
 
-                // Center the window on current playback time
-                const centerTime = currentTime;
-                const startTime  = Math.max(0, centerTime - halfWin);
-                const endTime    = Math.min(duration, centerTime + halfWin);
-                const startSamp  = Math.floor(startTime * sr);
-                const endSamp    = Math.min(Math.floor(endTime * sr), totalSamp - 1);
-                const sampWindow = endSamp - startSamp;
-
-                if (sampWindow > 0) {
-                    // Find max amplitude for normalization
-                    let maxAmp = 0.001;
-                    for (let i = startSamp; i < endSamp; i++) {
-                        if (Math.abs(pcm[i]) > maxAmp) maxAmp = Math.abs(pcm[i]);
-                    }
-
-                    // Draw filled waveform (above = purple, below = pink)
-                    const step = sampWindow / W;
-
-                    // Fill above origin (positive)
-                    ctx.beginPath();
-                    ctx.moveTo(0, mid);
-                    for (let x = 0; x < W; x++) {
-                        const s   = startSamp + Math.floor(x * step);
-                        const val = (pcm[Math.min(s, totalSamp-1)] / maxAmp) * (mid - 6);
-                        ctx.lineTo(x, mid - Math.max(0, val));
-                    }
-                    ctx.lineTo(W, mid);
-                    ctx.closePath();
-                    ctx.fillStyle = "rgba(109,40,217,0.2)";
-                    ctx.fill();
-
-                    // Fill below origin (negative)
-                    ctx.beginPath();
-                    ctx.moveTo(0, mid);
-                    for (let x = 0; x < W; x++) {
-                        const s   = startSamp + Math.floor(x * step);
-                        const val = (pcm[Math.min(s, totalSamp-1)] / maxAmp) * (mid - 6);
-                        ctx.lineTo(x, mid - Math.min(0, val));
-                    }
-                    ctx.lineTo(W, mid);
-                    ctx.closePath();
-                    ctx.fillStyle = "rgba(217,70,239,0.15)";
-                    ctx.fill();
-
-                    // Draw waveform line
-                    ctx.beginPath();
-                    ctx.lineWidth   = 1.5;
-                    ctx.strokeStyle = "#7c3aed";
-
-                    for (let x = 0; x < W; x++) {
-                        const s   = startSamp + Math.floor(x * step);
-                        const val = (pcm[Math.min(s, totalSamp-1)] / maxAmp) * (mid - 6);
-                        if (x === 0) ctx.moveTo(x, mid - val);
-                        else         ctx.lineTo(x, mid - val);
-                    }
-                    ctx.stroke();
-
-                    // Playhead — vertical line at center
-                    const px = W / 2;
-                    ctx.strokeStyle = "#ef4444";
-                    ctx.lineWidth   = 2;
-                    ctx.setLineDash([]);
-                    ctx.beginPath();
-                    ctx.moveTo(px, 4);
-                    ctx.lineTo(px, H - 4);
-                    ctx.stroke();
-
-                    // Current time label
-                    ctx.fillStyle = "#ef4444";
-                    ctx.font      = "bold 9px monospace";
-                    ctx.fillText(`${currentTime.toFixed(2)}s`, px + 4, 14);
+                // Find local max for normalization
+                let maxAmp = 0.001;
+                const step = Math.max(1, Math.floor(range / W));
+                for (let i = s0; i < sN; i += step) {
+                    if (Math.abs(pcm[Math.min(i, total-1)]) > maxAmp)
+                        maxAmp = Math.abs(pcm[Math.min(i, total-1)]);
                 }
-            } else if (audioFeatures?.mel) {
-                // Fallback: draw mel as waveform-like shape
-                const mel    = audioFeatures.mel.slice(0, W);
-                const melMax = Math.max(...mel) || 1;
-                ctx.beginPath();
-                ctx.lineWidth   = 1.5;
-                ctx.strokeStyle = "#a78bfa";
+                maxAmp = Math.max(maxAmp, 0.01);
+
+                // Positive fill
+                ctx.fillStyle = "rgba(109,40,217,0.18)";
+                ctx.beginPath(); ctx.moveTo(0, mid);
                 for (let x = 0; x < W; x++) {
-                    const idx = Math.floor((x / W) * mel.length);
-                    const val = (mel[idx] / melMax) * (mid - 6);
-                    const y   = x % 2 === 0 ? mid - val * 0.6 : mid + val * 0.4;
-                    if (x === 0) ctx.moveTo(x, y);
-                    else         ctx.lineTo(x, y);
+                    const s   = s0 + Math.floor((x / W) * range);
+                    const val = pcm[Math.min(s, total-1)] / maxAmp;
+                    ctx.lineTo(x, mid - Math.max(0, val) * (mid - 6));
+                }
+                ctx.lineTo(W, mid); ctx.closePath(); ctx.fill();
+
+                // Negative fill
+                ctx.fillStyle = "rgba(217,70,239,0.12)";
+                ctx.beginPath(); ctx.moveTo(0, mid);
+                for (let x = 0; x < W; x++) {
+                    const s   = s0 + Math.floor((x / W) * range);
+                    const val = pcm[Math.min(s, total-1)] / maxAmp;
+                    ctx.lineTo(x, mid - Math.min(0, val) * (mid - 6));
+                }
+                ctx.lineTo(W, mid); ctx.closePath(); ctx.fill();
+
+                // Waveform line
+                ctx.strokeStyle = "#7c3aed";
+                ctx.lineWidth   = 1.8;
+                ctx.beginPath();
+                for (let x = 0; x < W; x++) {
+                    const s   = s0 + Math.floor((x / W) * range);
+                    const val = pcm[Math.min(s, total-1)] / maxAmp;
+                    const y   = mid - val * (mid - 6);
+                    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
                 }
                 ctx.stroke();
+
+                // Playhead
+                const px = W / 2;
+                ctx.strokeStyle = "#ef4444";
+                ctx.lineWidth   = 2;
+                ctx.beginPath(); ctx.moveTo(px, 2); ctx.lineTo(px, H - 2); ctx.stroke();
+
+                // Dot on waveform at playhead
+                const curSamp = Math.floor(currentTime * sr);
+                const curVal  = (pcm[Math.min(curSamp, total-1)] / maxAmp);
+                const curY    = mid - curVal * (mid - 6);
+                ctx.fillStyle = "#ef4444";
+                ctx.beginPath(); ctx.arc(px, curY, 4, 0, Math.PI * 2); ctx.fill();
+
+                // Stats
+                const win    = pcm.slice(Math.max(0, curSamp - 200), curSamp + 200);
+                const rms    = Math.sqrt(win.reduce((a, v) => a + v*v, 0) / (win.length || 1));
+                document.getElementById("av-amp")  && (document.getElementById("av-amp").textContent  = curVal.toFixed(3));
+                document.getElementById("av-rms")  && (document.getElementById("av-rms").textContent  = rms.toFixed(3));
             }
 
-            // Origin labels
-            ctx.fillStyle = "#a78bfa";
-            ctx.font      = "8px sans-serif";
-            ctx.fillText("+", 4, 14);
-            ctx.fillText("–", 4, H - 6);
-            ctx.fillText("0", 4, mid + 4);
+            // Y-axis labels
+            ctx.fillStyle = "rgba(124,58,237,0.6)";
+            ctx.font      = "9px monospace";
+            ctx.textAlign = "left";
+            ctx.fillText("+1", 3, 12);
+            ctx.fillText(" 0", 3, mid + 4);
+            ctx.fillText("-1", 3, H - 4);
 
-            waveAnimRef.current = requestAnimationFrame(draw);
+            wAnimRef.current = requestAnimationFrame(draw);
         };
 
-        waveAnimRef.current = requestAnimationFrame(draw);
-        return () => { if (waveAnimRef.current) cancelAnimationFrame(waveAnimRef.current); };
-    }, [status, currentTime, duration, audioFeatures]);
+        wAnimRef.current = requestAnimationFrame(draw);
+        return () => { if (wAnimRef.current) cancelAnimationFrame(wAnimRef.current); };
+    }, [status, currentTime, duration, tab]);
 
-    // ── FFT SPECTRUM draw loop ────────────────────────────────────────────────
+    // ── FFT spectrum draw ─────────────────────────────────────────────────────
     useEffect(() => {
-        const canvas = fftCanvasRef.current;
-        if (!canvas) return;
+        const canvas = fftRef.current;
+        if (!canvas || tab !== "spectrum") return;
 
         const draw = () => {
             const ctx = canvas.getContext("2d");
@@ -258,40 +214,57 @@ export default function AudioVisualizer({
             ctx.fillStyle = "#f3f0ff";
             ctx.fillRect(0, 0, W, H);
 
-            let bars = null;
-            if (status === "ready" && fftFrames.current.length > 0 && duration > 0) {
-                const progress = Math.max(0, Math.min(1, currentTime / duration));
-                const idx      = Math.floor(progress * (fftFrames.current.length - 1));
-                bars           = fftFrames.current[idx];
+            const pcm = pcmRef.current;
+            const sr  = srRef.current;
+            let   mags = null;
+
+            if (pcm && status === "ready") {
+                const s0    = Math.max(0, Math.floor(currentTime * sr) - FFT_SIZE / 2);
+                const slice = new Float32Array(FFT_SIZE);
+                for (let i = 0; i < FFT_SIZE; i++) slice[i] = pcm[Math.min(s0 + i, pcm.length - 1)];
+                mags = fftMags(slice);
             } else if (audioFeatures?.mel) {
                 const mel    = audioFeatures.mel.slice(0, NUM_BARS);
                 const melMin = Math.min(...mel);
                 const melMax = Math.max(...mel) || 1;
-                bars = mel.map(v => Math.max(0.03, (v - melMin) / (melMax - melMin)));
+                mags = { length: NUM_BARS };
+                mags = mel.map(v => Math.max(0.03, (v - melMin) / (melMax - melMin)));
             }
 
-            if (bars) {
-                const barW = W / bars.length;
-                for (let i = 0; i < bars.length; i++) {
-                    const barH = Math.max(3, bars[i] * (H - 4));
-                    const t    = i / bars.length;
+            if (mags) {
+                const isArray = Array.isArray(mags);
+                const len     = isArray ? mags.length : Math.min(mags.length, NUM_BARS * 4);
+                const step    = isArray ? 1 : Math.floor(len / NUM_BARS);
+                const barW    = W / NUM_BARS;
+
+                for (let b = 0; b < NUM_BARS; b++) {
+                    let val;
+                    if (isArray) {
+                        val = mags[Math.floor((b / NUM_BARS) * mags.length)];
+                    } else {
+                        let sum = 0;
+                        for (let j = 0; j < step; j++) sum += mags[b * step + j] || 0;
+                        val = sum / step;
+                    }
+                    const barH = Math.max(3, val * (H - 4));
+                    const t    = b / NUM_BARS;
                     const r    = Math.round(110 + t * 145);
                     const g    = Math.round(40  + t * 20);
-                    const b    = Math.round(210 - t * 50);
-                    ctx.fillStyle = `rgb(${r},${g},${b})`;
+                    const bv   = Math.round(210 - t * 50);
+                    ctx.fillStyle = `rgb(${r},${g},${bv})`;
                     ctx.beginPath();
-                    if (ctx.roundRect) ctx.roundRect(i*barW+1, H-barH, barW-2, barH, 2);
-                    else               ctx.rect(i*barW+1, H-barH, barW-2, barH);
+                    if (ctx.roundRect) ctx.roundRect(b * barW + 1, H - barH, barW - 2, barH, 2);
+                    else               ctx.rect(b * barW + 1, H - barH, barW - 2, barH);
                     ctx.fill();
                 }
             }
 
-            fftAnimRef.current = requestAnimationFrame(draw);
+            fAnimRef.current = requestAnimationFrame(draw);
         };
 
-        fftAnimRef.current = requestAnimationFrame(draw);
-        return () => { if (fftAnimRef.current) cancelAnimationFrame(fftAnimRef.current); };
-    }, [status, currentTime, duration, audioFeatures]);
+        fAnimRef.current = requestAnimationFrame(draw);
+        return () => { if (fAnimRef.current) cancelAnimationFrame(fAnimRef.current); };
+    }, [status, currentTime, duration, audioFeatures, tab]);
 
     if (!audioFeatures && !audioURL) return null;
 
@@ -300,13 +273,9 @@ export default function AudioVisualizer({
     const loudColor = rms > 0.05 ? "#15803d" : rms > 0.02 ? "#b45309" : "#1d4ed8";
     const zcrLabel  = zcr > 0.1  ? "Fast"    : zcr > 0.05 ? "Medium" : "Slow";
 
-    const tabStyle = (t) => ({
-        padding: "5px 14px",
-        borderRadius: 999,
-        fontSize: 10,
-        fontWeight: 700,
-        cursor: "pointer",
-        border: "none",
+    const tabBtn = (t, label) => ({
+        padding: "4px 12px", borderRadius: 999, fontSize: 10, fontWeight: 700,
+        cursor: "pointer", border: "none",
         backgroundColor: tab === t ? "#7c3aed" : "#ede9fe",
         color: tab === t ? "#fff" : "#7c3aed",
     });
@@ -322,12 +291,10 @@ export default function AudioVisualizer({
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 18px", borderBottom: "1px solid #e0d7f5", backgroundColor: "#ede9fe" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: "#ddd6fe", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <span style={{ fontSize: 14 }}>📊</span>
-                    </div>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: "#ddd6fe", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>📊</div>
                     <div>
-                        <p style={{ fontSize: 11, fontWeight: 700, color: "#3730a3" }}>Audio Analysis</p>
-                        <p style={{ fontSize: 9, color: "#7c3aed", marginTop: 1 }}>
+                        <p style={{ fontSize: 11, fontWeight: 700, color: "#3730a3", margin: 0 }}>Audio Analysis</p>
+                        <p style={{ fontSize: 9, color: "#7c3aed", margin: "2px 0 0" }}>
                             {status === "loading" ? "⏳ Decoding audio..."
                              : status === "ready"  ? `🔴 Live · synced · ${language || ""}`
                              :                       `CNN-LSTM features · ${language || ""}`}
@@ -335,64 +302,63 @@ export default function AudioVisualizer({
                     </div>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
-                    <button style={tabStyle("waveform")}  onClick={() => setTab("waveform")}>〰 Waveform</button>
-                    <button style={tabStyle("spectrum")}  onClick={() => setTab("spectrum")}>▦ Spectrum</button>
+                    <button style={tabBtn("waveform")} onClick={() => setTab("waveform")}>〰 Waveform</button>
+                    <button style={tabBtn("spectrum")} onClick={() => setTab("spectrum")}>▦ Spectrum</button>
                 </div>
             </div>
 
-            {/* Waveform canvas */}
-            <div style={{ display: tab === "waveform" ? "block" : "none", padding: "12px 18px 4px" }}>
-                <p style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>
-                    Audio waveform — above origin = positive, below = negative
-                </p>
-                <canvas ref={waveCanvasRef} width={560} height={110}
-                    style={{ width: "100%", height: 110, display: "block", borderRadius: 6 }} />
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3, marginBottom: 8 }}>
-                    <span style={{ fontSize: 8, color: "#a78bfa" }}>← 1s before</span>
-                    <span style={{ fontSize: 8, color: "#ef4444", fontWeight: 700 }}>▼ now</span>
-                    <span style={{ fontSize: 8, color: "#a78bfa" }}>1s after →</span>
+            {/* Waveform */}
+            {tab === "waveform" && (
+                <div style={{ padding: "12px 18px 4px" }}>
+                    <p style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 6px" }}>
+                        Raw PCM waveform — above zero = positive pressure · below = negative
+                    </p>
+                    <canvas ref={waveRef} width={560} height={110} style={{ width: "100%", height: 110, display: "block", borderRadius: 6 }} />
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, marginBottom: 10 }}>
+                        <span style={{ fontSize: 8, color: "#a78bfa" }}>← 0.5s before</span>
+                        <span style={{ fontSize: 8, color: "#ef4444", fontWeight: 700 }}>▼ now</span>
+                        <span style={{ fontSize: 8, color: "#a78bfa" }}>0.5s after →</span>
+                    </div>
                 </div>
-            </div>
+            )}
 
-            {/* Spectrum canvas */}
-            <div style={{ display: tab === "spectrum" ? "block" : "none", padding: "12px 18px 4px" }}>
-                <p style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>
-                    Frequency spectrum — synced to playback
-                </p>
-                <canvas ref={fftCanvasRef} width={560} height={110}
-                    style={{ width: "100%", height: 110, display: "block", borderRadius: 6 }} />
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3, marginBottom: 8 }}>
-                    <span style={{ fontSize: 8, color: "#a78bfa" }}>Low freq</span>
-                    <span style={{ fontSize: 8, color: "#a78bfa" }}>Mid freq</span>
-                    <span style={{ fontSize: 8, color: "#a78bfa" }}>High freq</span>
+            {/* Spectrum */}
+            {tab === "spectrum" && (
+                <div style={{ padding: "12px 18px 4px" }}>
+                    <p style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 6px" }}>
+                        Frequency spectrum — synced to playback position
+                    </p>
+                    <canvas ref={fftRef} width={560} height={110} style={{ width: "100%", height: 110, display: "block", borderRadius: 6 }} />
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, marginBottom: 10 }}>
+                        <span style={{ fontSize: 8, color: "#a78bfa" }}>Low freq</span>
+                        <span style={{ fontSize: 8, color: "#a78bfa" }}>Mid freq</span>
+                        <span style={{ fontSize: 8, color: "#a78bfa" }}>High freq</span>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Stats */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", margin: "0 18px 14px", borderRadius: 12, overflow: "hidden", border: "1px solid #e0d7f5" }}>
-                <div style={{ padding: "8px", textAlign: "center", backgroundColor: "#faf5ff" }}>
-                    <p style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", marginBottom: 3 }}>Loudness</p>
-                    <p style={{ fontSize: 13, fontWeight: 800, color: loudColor }}>{loudness}</p>
-                    <p style={{ fontSize: 8, fontFamily: "monospace", color: "#9ca3af" }}>RMS {rms.toFixed(4)}</p>
-                </div>
-                <div style={{ padding: "8px", textAlign: "center", backgroundColor: "#faf5ff", borderLeft: "1px solid #e0d7f5", borderRight: "1px solid #e0d7f5" }}>
-                    <p style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", marginBottom: 3 }}>Wave speed</p>
-                    <p style={{ fontSize: 13, fontWeight: 800, color: "#6d28d9" }}>{zcrLabel}</p>
-                    <p style={{ fontSize: 8, fontFamily: "monospace", color: "#9ca3af" }}>ZCR {zcr.toFixed(4)}</p>
-                </div>
-                <div style={{ padding: "8px", textAlign: "center", backgroundColor: "#faf5ff" }}>
-                    <p style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", marginBottom: 3 }}>Freq ceiling</p>
-                    <p style={{ fontSize: 13, fontWeight: 800, color: "#1d4ed8" }}>{(rolloff/1000).toFixed(1)} kHz</p>
-                    <p style={{ fontSize: 8, fontFamily: "monospace", color: "#9ca3af" }}>Rolloff</p>
-                </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", margin: "0 18px 14px", borderRadius: 12, overflow: "hidden", border: "1px solid #e0d7f5" }}>
+                {[
+                    { label: "Loudness",  id: null,     val: loudness,                    color: loudColor },
+                    { label: "Amplitude", id: "av-amp", val: "—",                         color: "#7c3aed" },
+                    { label: "Wave RMS",  id: "av-rms", val: rms.toFixed(3),              color: "#6d28d9" },
+                    { label: "Freq ceil", id: null,     val: (rolloff/1000).toFixed(1)+"k",color: "#1d4ed8" },
+                ].map((s, i) => (
+                    <div key={i} style={{ padding: "8px", textAlign: "center", backgroundColor: "#faf5ff", borderRight: i < 3 ? "1px solid #e0d7f5" : "none" }}>
+                        <p style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", margin: "0 0 3px" }}>{s.label}</p>
+                        <p id={s.id || undefined} style={{ fontSize: 13, fontWeight: 800, color: s.color, margin: 0 }}>{s.val}</p>
+                    </div>
+                ))}
             </div>
 
             {/* Footer */}
             <div style={{ margin: "0 18px 14px", padding: "10px 12px", borderRadius: 10, backgroundColor: "#ede9fe", border: "1px solid #c4b5fd", display: "flex", gap: 8 }}>
                 <span style={{ fontSize: 11 }}>🧠</span>
-                <p style={{ fontSize: 9, color: "#4c1d95", lineHeight: 1.6 }}>
-                    Waveform: raw PCM signal — above zero line = positive pressure, below = negative.
-                    Red line = current playback position. Spectrum: FFT frequency bars synced to same moment.
+                <p style={{ fontSize: 9, color: "#4c1d95", lineHeight: 1.6, margin: 0 }}>
+                    {tab === "waveform"
+                        ? "Raw PCM audio signal decoded from TTS output. Purple = positive pressure, pink = negative. Red dot tracks exact playback position. Each speech burst = one syllable/word."
+                        : "FFT computed from PCM window centered on current playback time. Cooley-Tukey algorithm with Hann window."}
                 </p>
             </div>
         </motion.div>
