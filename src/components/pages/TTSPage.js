@@ -522,6 +522,8 @@ const SmartTTS = () => {
                                             audioURL={audioURL}
                                             audioFeatures={audioFeatures}
                                             isPlaying={isPlaying}
+                                            currentTime={currentTime}
+                                            duration={duration}
                                             language={LANGUAGES.find(l => l.id === activeLang)?.name}
                                         />
                                     </motion.div>
