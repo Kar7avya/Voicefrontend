@@ -306,7 +306,9 @@ function HistoryView({ onBack, userId }) {
   const [expanded,  setExpanded]  = useState(null);
 
   useEffect(()=>{
+    // ← wait until userId is actually ready before fetching
     if (!userId) return;
+    setLoading(true);
     (async()=>{
       try {
         const [sr,st] = await Promise.all([
@@ -319,10 +321,12 @@ function HistoryView({ onBack, userId }) {
         ]);
         setSessions(sr.sessions||[]);
         setStats(st.stats||null);
-      } catch{}
+      } catch(e) {
+        console.error("History fetch error:", e);
+      }
       setLoading(false);
     })();
-  },[userId]);
+  },[userId]); // ← re-fetch whenever userId changes
 
   const del = async id => {
     await fetch(`${BACKEND_URL}/api/speakwell/sessions/${id}`, {
@@ -333,6 +337,17 @@ function HistoryView({ onBack, userId }) {
   };
 
   const rc={Excellent:"#30d158",Good:"#0a84ff","Needs Improvement":"#ffd60a",Poor:"#ff453a"};
+
+  // ← show spinner while waiting for userId
+  if (!userId) return (
+    <div style={{ minHeight:"100vh", background:"#000",
+      display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <div style={{ width:32, height:32, borderRadius:"50%",
+        border:"2px solid rgba(255,255,255,0.1)",
+        borderTop:"2px solid #fff", animation:"spin 1s linear infinite" }}/>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
 
   return (
     <div style={{ minHeight:"100vh", background:"#000",
@@ -553,15 +568,18 @@ export default function SpeakWell() {
   const [saving,      setSaving]      = useState(false);
   const [showName,    setShowName]    = useState(false);
   const [processing,  setProcessing]  = useState(false);
-  const [userId,      setUserId]      = useState(null); // ← current user ID
+  const [userId,      setUserId]      = useState(null);
+  const [authReady,   setAuthReady]   = useState(false); // ← new
 
-  // ── Get current logged-in user ──────────────────────────────────
+  // ── Get current logged-in user ────────────────────────────────
   useEffect(()=>{
     supabase.auth.getUser().then(({ data }) => {
-      if (data?.user) setUserId(data.user.id);
+      setUserId(data?.user?.id || null);
+      setAuthReady(true); // ← mark auth as resolved
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserId(session?.user?.id || null);
+      setAuthReady(true);
     });
     return () => listener.subscription.unsubscribe();
   }, []);
@@ -647,7 +665,6 @@ export default function SpeakWell() {
       });
       const deepData = await deepRes.json();
 
-      // ← send user_id in header so backend saves per user
       await fetch(`${BACKEND_URL}/api/speakwell/sessions`,{
         method:"POST",
         headers:{
@@ -685,7 +702,13 @@ export default function SpeakWell() {
   const scoreCol=score>=75?"#30d158":score>=50?"#ffd60a":score>0?"#ff453a":"rgba(255,255,255,0.2)";
   const statusLabel=analysis?.color==="green"?"Good gesture":analysis?.color==="yellow"?"Needs attention":analysis?.color==="red"?"Incorrect":"Ready";
 
-  if(view==="history") return <HistoryView onBack={()=>setView("practice")} userId={userId}/>;
+  // ← pass authReady so history knows when to start fetching
+  if(view==="history") return (
+    <HistoryView
+      onBack={()=>setView("practice")}
+      userId={authReady ? userId : null}
+    />
+  );
 
   return (
     <div style={{ position:"relative", width:"100%", height:"100vh",
