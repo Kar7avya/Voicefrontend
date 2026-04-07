@@ -525,6 +525,7 @@ const SmartTTS = () => {
                                             currentTime={currentTime}
                                             duration={duration}
                                             language={LANGUAGES.find(l => l.id === activeLang)?.name}
+                                            translatedText={emotionTranscript}
                                         />
                                     </motion.div>
                                 )}
