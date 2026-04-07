@@ -31,6 +31,7 @@ export default function AudioVisualizer({
     const wAnimRef = useRef(null);
     const pcmRef   = useRef(null);
     const srRef    = useRef(22050);
+    const durRef   = useRef(0);
 
     const [status, setStatus] = useState("idle");
     const [tab,    setTab]    = useState("guide");
@@ -57,7 +58,7 @@ export default function AudioVisualizer({
                 pcmRef.current = pcm;
 
                 const segCount = 8;
-                const segDur   = duration / segCount;
+                const actualDur = decoded.duration; const segDur = actualDur / segCount;
                 const built    = [];
                 for (let i = 0; i < segCount; i++) {
                     const t  = i * segDur;
@@ -79,7 +80,7 @@ export default function AudioVisualizer({
             }
         };
         run();
-    }, [audioURL, duration]);
+    }, [audioURL]);
 
     // ── Waveform draw ─────────────────────────────────────────────────────────
     useEffect(() => {
@@ -99,20 +100,21 @@ export default function AudioVisualizer({
             const sr  = srRef.current;
 
             // Color background per segment
-            if (duration > 0) {
+            const aDur = durRef.current || duration;
+            if (aDur > 0) {
                 segs.forEach(w => {
                     const lv    = getVolLevel(w.amp);
-                    const relSt = w.t / duration;
-                    const relEn = (w.t + w.dur) / duration;
+                    const relSt = w.t / aDur;
+                    const relEn = (w.t + w.dur) / aDur;
                     ctx.fillStyle = lv.bg + "99";
                     ctx.fillRect(relSt * W, 0, (relEn - relSt) * W, H);
                 });
             }
 
-            if (pcm && status === "ready" && duration > 0) {
+            if (pcm && status === "ready" && aDur > 0) {
                 const half   = WIN_SEC / 2;
                 const startT = Math.max(0, currentTime - half);
-                const endT   = Math.min(duration, currentTime + half);
+                const endT   = Math.min(aDur, currentTime + half);
                 const s0     = Math.floor(startT * sr);
                 const sN     = Math.floor(endT * sr);
                 const range  = Math.max(1, sN - s0);
@@ -159,7 +161,7 @@ export default function AudioVisualizer({
                 // Volume labels on wave
                 segs.forEach(w => {
                     const lv    = getVolLevel(w.amp);
-                    const relMid = (w.t + w.dur/2) / duration;
+                    const relMid = (w.t + w.dur/2) / aDur;
                     const wx    = relMid * W;
                     ctx.fillStyle   = lv.color + "cc";
                     ctx.font        = "bold 9px sans-serif";
@@ -194,6 +196,7 @@ export default function AudioVisualizer({
 
     if (!audioFeatures && !audioURL) return null;
 
+    const actualD = durRef.current || duration;
     const nowSeg  = segs.find(w => currentTime >= w.t && currentTime < w.t + w.dur);
     const nowVol  = nowSeg ? getVolLevel(nowSeg.amp) : null;
 
