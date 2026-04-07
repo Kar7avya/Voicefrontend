@@ -150,7 +150,7 @@ export default function AudioVisualizer({
                     const lv    = getVolLevel(w.amp);
                     const x0    = Math.floor((w.t / aDur) * W);
                     const x1    = Math.floor(((w.t + w.dur) / aDur) * W);
-                    const segW  = Math.max(2, x1 - x0);
+                    
 
                     // Draw segment wave fill with color
                     ctx.fillStyle = lv.bg + "bb";
