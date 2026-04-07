@@ -1,98 +1,75 @@
 import React, { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
+// ── Volume level classifier ───────────────────────────────────────────────────
 function getVolLevel(amp) {
     if (amp >= 0.65) return {
         label: "🔊 LOUD",   short: "LOUD",
         color: "#d97706",   bg: "#fef3c7", border: "#fcd34d",
-        tip:   "Speak with full voice",
+        tip:   "Speak with FULL voice here",
         pct:   Math.min(100, Math.round(amp * 100)),
     };
     if (amp >= 0.30) return {
         label: "🔉 MEDIUM", short: "MEDIUM",
         color: "#1d4ed8",   bg: "#dbeafe", border: "#93c5fd",
-        tip:   "Normal speaking voice",
+        tip:   "Use NORMAL speaking voice here",
         pct:   Math.min(100, Math.round(amp * 100)),
     };
     return {
         label: "🔈 SOFT",   short: "SOFT",
         color: "#4b5563",   bg: "#f3f4f6", border: "#d1d5db",
-        tip:   "Gentle, quiet",
+        tip:   "LOWER your voice here",
         pct:   Math.min(100, Math.round(amp * 100)),
     };
 }
 
-// ── Detect word-like segments from PCM using silence detection ────────────────
-function detectWordSegments(pcm, sr) {
-    const frameSize  = Math.floor(sr * 0.02);   // 20ms frames
-    const silThresh  = 0.008;                    // silence threshold
-    const minWordMs  = 80;                       // min word length ms
-    const minSilMs   = 60;                       // min silence gap ms
-    const minWordFrames = Math.floor(minWordMs / 20);
-    const minSilFrames  = Math.floor(minSilMs  / 20);
+// ── Detect speech segments from silence ───────────────────────────────────────
+function detectSegments(pcm, sr) {
+    const frameMs   = 20;
+    const frameSize = Math.floor(sr * frameMs / 1000);
+    const silThresh = 0.006;
+    const minWordF  = Math.floor(80  / frameMs);
+    const minSilF   = Math.floor(60  / frameMs);
 
-    // Compute RMS per frame
-    const frames = [];
+    const rms = [];
     for (let i = 0; i + frameSize < pcm.length; i += frameSize) {
-        let sum = 0;
-        for (let j = 0; j < frameSize; j++) sum += pcm[i+j] * pcm[i+j];
-        frames.push(Math.sqrt(sum / frameSize));
+        let s = 0;
+        for (let j = 0; j < frameSize; j++) s += pcm[i+j]*pcm[i+j];
+        rms.push(Math.sqrt(s/frameSize));
     }
 
-    // Mark voiced/silent frames
-    const voiced = frames.map(r => r > silThresh);
-
-    // Find word boundaries
-    const segments = [];
-    let inWord  = false;
-    let wordStart = 0;
-    let silCount  = 0;
+    const voiced = rms.map(r => r > silThresh);
+    const segs   = [];
+    let inWord = false, wordStart = 0, silCount = 0;
 
     for (let i = 0; i < voiced.length; i++) {
         if (!inWord && voiced[i]) {
-            inWord    = true;
-            wordStart = i;
-            silCount  = 0;
+            inWord = true; wordStart = i; silCount = 0;
         } else if (inWord) {
             if (!voiced[i]) {
                 silCount++;
-                if (silCount >= minSilFrames) {
+                if (silCount >= minSilF) {
                     const wordEnd = i - silCount;
-                    const len     = wordEnd - wordStart;
-                    if (len >= minWordFrames) {
-                        segments.push({
-                            t:   wordStart * 0.02,
-                            dur: len * 0.02,
-                        });
+                    if (wordEnd - wordStart >= minWordF) {
+                        segs.push({ t: wordStart * frameMs/1000, dur: (wordEnd - wordStart) * frameMs/1000 });
                     }
-                    inWord   = false;
-                    silCount = 0;
+                    inWord = false; silCount = 0;
                 }
-            } else {
-                silCount = 0;
-            }
+            } else { silCount = 0; }
         }
     }
-    // Last word
-    if (inWord) {
-        const len = voiced.length - wordStart;
-        if (len >= minWordFrames) {
-            segments.push({ t: wordStart * 0.02, dur: len * 0.02 });
-        }
+    if (inWord && voiced.length - wordStart >= minWordF) {
+        segs.push({ t: wordStart * frameMs/1000, dur: (voiced.length - wordStart) * frameMs/1000 });
     }
-
-    return segments;
+    return segs;
 }
 
-// ── Compute RMS for a segment ─────────────────────────────────────────────────
-function segmentRMS(pcm, sr, t, dur) {
+function segRMS(pcm, sr, t, dur) {
     const s0 = Math.floor(t * sr);
     const sN = Math.floor((t + dur) * sr);
     let   sum = 0, cnt = 0;
-    for (let i = s0; i < Math.min(sN, pcm.length); i++) {
-        sum += pcm[i] * pcm[i]; cnt++;
-    }
-    return cnt > 0 ? Math.sqrt(sum / cnt) : 0;
+    for (let i = s0; i < Math.min(sN, pcm.length); i++) { sum += pcm[i]*pcm[i]; cnt++; }
+    return cnt > 0 ? Math.sqrt(sum/cnt) : 0;
 }
 
 const WIN_SEC = 1.4;
@@ -100,24 +77,23 @@ const WIN_SEC = 1.4;
 export default function AudioVisualizer({
     audioURL, audioFeatures, isPlaying, currentTime, duration, language, translatedText
 }) {
-    const waveRef  = useRef(null);
-    const wAnimRef = useRef(null);
-    const pcmRef   = useRef(null);
-    const srRef    = useRef(22050);
-    const durRef   = useRef(0);
+    const canvasRef = useRef(null);
+    const animRef   = useRef(null);
+    const pcmRef    = useRef(null);
+    const srRef     = useRef(22050);
+    const durRef    = useRef(0);
 
     const [status, setStatus] = useState("idle");
-    const [tab,    setTab]    = useState("guide");
-    const [words,  setWords]  = useState([]);   // detected word segments with volume
+    const [segs,   setSegs]   = useState([]);   // detected speech segments
 
-    // ── Decode + detect words ─────────────────────────────────────────────────
+    // ── Decode audio + detect segments ───────────────────────────────────────
     useEffect(() => {
         if (!audioURL) return;
         pcmRef.current = null;
         setStatus("loading");
-        setWords([]);
+        setSegs([]);
 
-        const run = async () => {
+        (async () => {
             try {
                 const res     = await fetch(audioURL);
                 if (!res.ok) throw new Error("fetch failed");
@@ -132,67 +108,72 @@ export default function AudioVisualizer({
                 pcmRef.current = pcm;
                 durRef.current = decoded.duration;
 
-                // Detect word-like segments from silence
-                const segs = detectWordSegments(pcm, sr);
+                // Detect speech segments
+                const raw    = detectSegments(pcm, sr);
+                const withRms = raw.map(s => ({ ...s, rms: segRMS(pcm, sr, s.t, s.dur) }));
+                const maxRms  = Math.max(...withRms.map(s => s.rms), 0.001);
 
-                // Compute RMS for each segment
-                const withRms = segs.map(s => ({
-                    ...s,
-                    rms: segmentRMS(pcm, sr, s.t, s.dur),
-                }));
-
-                // Normalize RMS to 0–1
-                const maxRms = Math.max(...withRms.map(s => s.rms), 0.001);
-                const normed = withRms.map((s, i) => ({
+                // Assign word labels from translatedText
+                const tWords  = translatedText ? translatedText.trim().split(/\s+/) : [];
+                const normed  = withRms.map((s, i) => ({
                     ...s,
                     amp:   s.rms / maxRms,
-                    label: `Word ${i + 1}`,
+                    word:  tWords[i] ? tWords[i] : `Part ${i+1}`,
                 }));
 
-                // Split translated text into words and assign
-                if (translatedText) {
-                    const tWords = translatedText.trim().split(/\s+/);
-                    normed.forEach((s, i) => {
-                        s.label = tWords[i] ? `"${tWords[i]}"` : `Word ${i+1}`;
-                    });
-                }
-
-                setWords(normed);
+                setSegs(normed);
                 setStatus("ready");
             } catch (e) {
                 console.warn("AudioVisualizer:", e.message);
                 setStatus("error");
             }
-        };
-        run();
+        })();
     }, [audioURL, translatedText]);
 
-    // ── Waveform draw ─────────────────────────────────────────────────────────
+    // ── Canvas draw — waveform with colored bands ─────────────────────────────
     useEffect(() => {
-        const canvas = waveRef.current;
-        if (!canvas || tab !== "wave") return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
 
         const draw = () => {
-            const ctx = canvas.getContext("2d");
-            const W   = canvas.width;
-            const H   = canvas.height;
-            const mid = H / 2;
+            const ctx  = canvas.getContext("2d");
+            const W    = canvas.width;
+            const H    = canvas.height;
+            const mid  = H / 2;
+            const aDur = durRef.current || duration || 1;
             ctx.clearRect(0, 0, W, H);
             ctx.fillStyle = "#faf5ff";
             ctx.fillRect(0, 0, W, H);
 
-            const pcm  = pcmRef.current;
-            const sr   = srRef.current;
-            const aDur = durRef.current || duration || 1;
+            const pcm = pcmRef.current;
+            const sr  = srRef.current;
 
-            // Color background per word
-            words.forEach(w => {
-                const lv    = getVolLevel(w.amp);
-                const relSt = w.t / aDur;
-                const relEn = (w.t + w.dur) / aDur;
-                ctx.fillStyle = lv.bg + "dd";
-                ctx.fillRect(relSt * W, 0, Math.max(2, (relEn - relSt) * W), H);
-            });
+            // ── Colored band per segment ──────────────────────────────────────
+            if (aDur > 0) {
+                segs.forEach(w => {
+                    const lv    = getVolLevel(w.amp);
+                    const relSt = Math.max(0, w.t / aDur);
+                    const relEn = Math.min(1, (w.t + w.dur) / aDur);
+                    ctx.fillStyle = lv.bg + "ee";
+                    ctx.fillRect(relSt * W, 0, Math.max(2, (relEn - relSt) * W), H);
+
+                    // Volume label at bottom of each band — spaced to avoid overlap
+                    const bw = (relEn - relSt) * W;
+                    if (bw > 30) {
+                        const bx = relSt * W + bw / 2;
+                        ctx.fillStyle   = lv.color;
+                        ctx.font        = `bold ${bw > 60 ? 9 : 8}px sans-serif`;
+                        ctx.textAlign   = "center";
+                        ctx.fillText(lv.short, bx, H - 5);
+                    }
+                });
+            }
+
+            // ── Center dashed line ────────────────────────────────────────────
+            ctx.strokeStyle = "rgba(124,58,237,0.2)";
+            ctx.lineWidth   = 1; ctx.setLineDash([4, 4]);
+            ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke();
+            ctx.setLineDash([]);
 
             if (pcm && status === "ready" && aDur > 0) {
                 const half   = WIN_SEC / 2;
@@ -208,77 +189,63 @@ export default function AudioVisualizer({
                     if (Math.abs(pcm[Math.min(i, total-1)]) > mx)
                         mx = Math.abs(pcm[Math.min(i, total-1)]);
 
-                ctx.strokeStyle = "rgba(124,58,237,0.2)";
-                ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
-                ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke();
-                ctx.setLineDash([]);
-
-                ctx.fillStyle = "rgba(109,40,217,0.15)";
+                // Purple fill above
+                ctx.fillStyle = "rgba(109,40,217,0.2)";
                 ctx.beginPath(); ctx.moveTo(0, mid);
                 for (let x = 0; x < W; x++) {
-                    const s = s0 + Math.floor((x/W)*range);
-                    const v = pcm[Math.min(s, total-1)] / mx;
-                    ctx.lineTo(x, mid - Math.max(0, v) * (mid-12));
+                    const v = pcm[Math.min(s0 + Math.floor((x/W)*range), total-1)] / mx;
+                    ctx.lineTo(x, mid - Math.max(0, v) * (mid - 18));
                 }
                 ctx.lineTo(W, mid); ctx.closePath(); ctx.fill();
 
-                ctx.fillStyle = "rgba(236,72,153,0.1)";
+                // Pink fill below
+                ctx.fillStyle = "rgba(236,72,153,0.12)";
                 ctx.beginPath(); ctx.moveTo(0, mid);
                 for (let x = 0; x < W; x++) {
-                    const s = s0 + Math.floor((x/W)*range);
-                    const v = pcm[Math.min(s, total-1)] / mx;
-                    ctx.lineTo(x, mid - Math.min(0, v) * (mid-12));
+                    const v = pcm[Math.min(s0 + Math.floor((x/W)*range), total-1)] / mx;
+                    ctx.lineTo(x, mid - Math.min(0, v) * (mid - 18));
                 }
                 ctx.lineTo(W, mid); ctx.closePath(); ctx.fill();
 
+                // Wave line
                 ctx.strokeStyle = "#7c3aed"; ctx.lineWidth = 2;
                 ctx.beginPath();
                 for (let x = 0; x < W; x++) {
-                    const s = s0 + Math.floor((x/W)*range);
-                    const v = pcm[Math.min(s, total-1)] / mx;
-                    const y = mid - v * (mid - 12);
+                    const v = pcm[Math.min(s0 + Math.floor((x/W)*range), total-1)] / mx;
+                    const y = mid - v * (mid - 18);
                     x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
                 }
                 ctx.stroke();
-
-
 
                 // Playhead
                 const px = W / 2;
                 ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 2.5;
                 ctx.beginPath(); ctx.moveTo(px, 2); ctx.lineTo(px, H-2); ctx.stroke();
-                const cs = Math.floor(currentTime * sr);
-                const cv = pcm[Math.min(cs, total-1)] / mx;
-                const cy = mid - cv * (mid-12);
+                const cv = pcm[Math.min(Math.floor(currentTime * sr), total-1)] / mx;
+                const cy = mid - cv * (mid - 18);
                 ctx.fillStyle = "#ef4444";
                 ctx.beginPath(); ctx.arc(px, cy, 5, 0, Math.PI*2); ctx.fill();
                 ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5;
                 ctx.beginPath(); ctx.arc(px, cy, 5, 0, Math.PI*2); ctx.stroke();
             }
 
+            // Axis labels
             ctx.font = "bold 9px sans-serif"; ctx.textAlign = "left";
-            ctx.fillStyle = "rgba(109,40,217,0.5)";
-            ctx.fillText("LOUD ↑", 4, 13);
-            ctx.fillText("SOFT ↓", 4, H - 4);
+            ctx.fillStyle = "rgba(109,40,217,0.6)";
+            ctx.fillText("LOUD ↑", 4, 14);
+            ctx.fillText("SOFT ↓", 4, H - 18);
 
-            wAnimRef.current = requestAnimationFrame(draw);
+            animRef.current = requestAnimationFrame(draw);
         };
 
-        wAnimRef.current = requestAnimationFrame(draw);
-        return () => { if (wAnimRef.current) cancelAnimationFrame(wAnimRef.current); };
-    }, [status, currentTime, duration, words, tab]);
+        animRef.current = requestAnimationFrame(draw);
+        return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
+    }, [status, currentTime, duration, segs]);
 
-    if (!audioFeatures && !audioURL) return null;
+    if (!audioURL && !audioFeatures) return null;
 
-    const nowWord = words.find(w => currentTime >= w.t && currentTime < w.t + w.dur);
-    const nowVol  = nowWord ? getVolLevel(nowWord.amp) : null;
-
-    const tabBtn = (t, label) => ({
-        padding: "5px 14px", borderRadius: 999, fontSize: 11, fontWeight: 700,
-        cursor: "pointer", border: "none",
-        backgroundColor: tab === t ? "#7c3aed" : "#ede9fe",
-        color: tab === t ? "#fff" : "#7c3aed",
-    });
+    const nowSeg = segs.find(w => currentTime >= w.t && currentTime < w.t + w.dur);
+    const nowVol = nowSeg ? getVolLevel(nowSeg.amp) : null;
 
     return (
         <motion.div
@@ -291,153 +258,124 @@ export default function AudioVisualizer({
             {/* Header */}
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 18px", borderBottom:"1px solid #e0d7f5", backgroundColor:"#ede9fe" }}>
                 <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                    <div style={{ width:28, height:28, borderRadius:8, backgroundColor:"#ddd6fe", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>📊</div>
+                    <div style={{ width:28, height:28, borderRadius:8, backgroundColor:"#ddd6fe", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>🎙️</div>
                     <div>
-                        <p style={{ fontSize:11, fontWeight:700, color:"#3730a3", margin:0 }}>Voice Volume Guide</p>
+                        <p style={{ fontSize:11, fontWeight:700, color:"#3730a3", margin:0 }}>Speaking Volume Guide</p>
                         <p style={{ fontSize:9, color:"#7c3aed", margin:"2px 0 0" }}>
-                            {status === "loading" ? "⏳ Detecting words..."
-                             : status === "ready"  ? `🔴 Live · ${words.length} words detected · ${language || ""}`
+                            {status === "loading" ? "⏳ Analysing audio..."
+                             : status === "ready"  ? `How loud to speak · ${segs.length} parts detected · ${language || ""}`
                              :                       language || ""}
                         </p>
                     </div>
                 </div>
-                <div style={{ display:"flex", gap:6 }}>
-                    <button style={tabBtn("guide")} onClick={() => setTab("guide")}>📋 Word guide</button>
-                    <button style={tabBtn("wave")}  onClick={() => setTab("wave")}>〰 Waveform</button>
+                {/* Live indicator */}
+                <div style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:999, backgroundColor: isPlaying ? "#dcfce7" : "#ede9fe", border:`1px solid ${isPlaying ? "#86efac" : "#c4b5fd"}`, fontSize:9, fontWeight:700, color: isPlaying ? "#15803d" : "#7c3aed" }}>
+                    <span style={{ width:6, height:6, borderRadius:"50%", backgroundColor: isPlaying ? "#16a34a" : "#7c3aed", display:"inline-block" }} />
+                    {isPlaying ? "Playing" : "Ready"}
                 </div>
             </div>
 
-            {/* ── WORD GUIDE TAB ── */}
-            {tab === "guide" && (
-                <div style={{ padding:"14px 18px" }}>
-
-                    {/* Now playing banner */}
-                    {nowVol && nowWord && (
-                        <motion.div
-                            key={nowWord.t}
-                            initial={{ opacity: 0, scale: 0.97 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            style={{ padding:"10px 14px", borderRadius:12, backgroundColor: nowVol.bg, border:`2px solid ${nowVol.border}`, marginBottom:14, display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}
-                        >
-                            <p style={{ fontSize:10, fontWeight:700, color: nowVol.color, textTransform:"uppercase", margin:0 }}>Now →</p>
-                            <p style={{ fontSize:20, fontWeight:800, color:"#111827", margin:0 }}>{nowWord.label}</p>
-                            <p style={{ fontSize:18, fontWeight:800, color: nowVol.color, margin:0 }}>{nowVol.label}</p>
-                            <p style={{ fontSize:11, color:"#374151", margin:0 }}>{nowVol.tip}</p>
-                            <div style={{ flex:1, minWidth:80, height:8, background:"#e5e7eb", borderRadius:999, overflow:"hidden" }}>
+            {/* ── NOW PLAYING BANNER ── */}
+            <AnimatePresence mode="wait">
+                {nowVol && nowSeg && (
+                    <motion.div
+                        key={nowSeg.t}
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        style={{ margin:"12px 18px 0", padding:"12px 16px", borderRadius:12, backgroundColor: nowVol.bg, border:`2px solid ${nowVol.border}` }}
+                    >
+                        <p style={{ fontSize:9, fontWeight:700, color: nowVol.color, textTransform:"uppercase", margin:"0 0 4px" }}>Right now — speak like this:</p>
+                        <div style={{ display:"flex", alignItems:"center", gap:14, flexWrap:"wrap" }}>
+                            <p style={{ fontSize:26, fontWeight:900, color: nowVol.color, margin:0 }}>{nowVol.label}</p>
+                            <p style={{ fontSize:12, color:"#374151", margin:0, fontWeight:600 }}>{nowVol.tip}</p>
+                            <div style={{ flex:1, minWidth:80, height:10, background:"#e5e7eb", borderRadius:999, overflow:"hidden" }}>
                                 <motion.div
                                     style={{ height:"100%", borderRadius:999, backgroundColor: nowVol.color }}
                                     animate={{ width: nowVol.pct + "%" }}
                                     transition={{ duration: 0.15 }}
                                 />
                             </div>
-                            <span style={{ fontSize:13, fontWeight:700, color: nowVol.color }}>{nowVol.pct}%</span>
-                        </motion.div>
-                    )}
-
-                    {/* Word cards — scrollable row */}
-                    {status === "ready" && words.length > 0 && (
-                        <div>
-                            <p style={{ fontSize:10, fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.08em", margin:"0 0 10px" }}>
-                                Volume for each word
-                            </p>
-                            <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:6 }}>
-                                {words.map((w, i) => {
-                                    const lv       = getVolLevel(w.amp);
-                                    const isActive = currentTime >= w.t && currentTime < w.t + w.dur;
-                                    return (
-                                        <div key={i} style={{
-                                            borderRadius:10,
-                                            padding:"10px 12px",
-                                            backgroundColor: lv.bg,
-                                            border: `${isActive ? 2.5 : 1.5}px solid ${lv.border}`,
-                                            minWidth:90,
-                                            flexShrink: 0,
-                                            transform: isActive ? "scale(1.08)" : "scale(1)",
-                                            transition: "all 0.2s",
-                                            boxShadow: isActive ? `0 4px 16px ${lv.color}44` : "none",
-                                        }}>
-                                            <p style={{ fontSize:15, fontWeight:700, color:"#1f2937", margin:"0 0 4px", whiteSpace:"nowrap" }}>
-                                                {w.label}
-                                            </p>
-                                            <p style={{ fontSize:12, fontWeight:800, color: lv.color, margin:"0 0 6px" }}>
-                                                {lv.label}
-                                            </p>
-                                            <div style={{ height:5, background:"#e5e7eb", borderRadius:999, overflow:"hidden", marginBottom:4 }}>
-                                                <div style={{ height:"100%", width: lv.pct+"%", background: lv.color, borderRadius:999 }} />
-                                            </div>
-                                            <p style={{ fontSize:9, color:"#6b7280", margin:0 }}>{lv.pct}% volume</p>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                            <span style={{ fontSize:14, fontWeight:800, color: nowVol.color }}>{nowVol.pct}%</span>
                         </div>
-                    )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-                    {status === "loading" && (
-                        <div style={{ padding:"20px 0", textAlign:"center", color:"#7c3aed", fontSize:12 }}>
-                            ⏳ Detecting words from audio...
-                        </div>
-                    )}
-
-                    {/* Legend */}
-                    <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginTop:14 }}>
-                        {[
-                            { bg:"#fef3c7", color:"#92400e", label:"🔊 LOUD — full voice" },
-                            { bg:"#dbeafe", color:"#1e40af", label:"🔉 MEDIUM — normal" },
-                            { bg:"#f3f4f6", color:"#374151", label:"🔈 SOFT — quiet" },
-                        ].map((l, i) => (
-                            <span key={i} style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:999, fontSize:10, fontWeight:600, backgroundColor:l.bg, color:l.color }}>
-                                {l.label}
-                            </span>
-                        ))}
-                    </div>
+            {/* ── WAVEFORM with colored bands ── */}
+            <div style={{ padding:"12px 18px 4px" }}>
+                <div style={{ display:"flex", gap:14, marginBottom:8, flexWrap:"wrap" }}>
+                    <span style={{ fontSize:10, fontWeight:600, color:"#7c3aed" }}>📈 Tall wave = loud part</span>
+                    <span style={{ fontSize:10, fontWeight:600, color:"#7c3aed" }}>➖ Flat = soft / pause</span>
+                    <span style={{ fontSize:10, fontWeight:600, color:"#ef4444" }}>▼ Red = now</span>
                 </div>
-            )}
+                <canvas
+                    ref={canvasRef}
+                    width={560}
+                    height={120}
+                    style={{ width:"100%", height:120, display:"block", borderRadius:8 }}
+                />
+                <div style={{ display:"flex", justifyContent:"space-between", margin:"4px 0 6px" }}>
+                    <span style={{ fontSize:10, color:"#a78bfa" }}>← Earlier in sentence</span>
+                    <span style={{ fontSize:10, color:"#a78bfa" }}>Later in sentence →</span>
+                </div>
+            </div>
 
-            {/* ── WAVEFORM TAB ── */}
-            {tab === "wave" && (
-                <div style={{ padding:"12px 18px" }}>
-                    {/* How to read */}
-                    <div style={{ display:"flex", gap:14, marginBottom:10, flexWrap:"wrap" }}>
-                        <span style={{ fontSize:10, color:"#7c3aed", fontWeight:600 }}>📈 Tall wave = LOUD</span>
-                        <span style={{ fontSize:10, color:"#7c3aed", fontWeight:600 }}>➖ Flat line = SOFT / pause</span>
-                        <span style={{ fontSize:10, color:"#ef4444", fontWeight:600 }}>▼ Red line = now</span>
-                    </div>
-                    <canvas ref={waveRef} width={560} height={130}
-                        style={{ width:"100%", height:130, display:"block", borderRadius:8 }} />
-                    {/* Color legend — one row per word */}
-                    <div style={{ display:"flex", gap:4, marginTop:8, flexWrap:"wrap" }}>
-                        {words.map((w, i) => {
-                            const lv = getVolLevel(w.amp);
+            {/* ── WORD CARDS — full sentence breakdown ── */}
+            {status === "ready" && segs.length > 0 && (
+                <div style={{ padding:"0 18px 14px" }}>
+                    <p style={{ fontSize:10, fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.08em", margin:"4px 0 8px" }}>
+                        Full sentence — word by word volume guide
+                    </p>
+                    <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:4 }}>
+                        {segs.map((w, i) => {
+                            const lv       = getVolLevel(w.amp);
                             const isActive = currentTime >= w.t && currentTime < w.t + w.dur;
                             return (
                                 <div key={i} style={{
-                                    display:"flex", alignItems:"center", gap:4,
-                                    padding:"3px 8px", borderRadius:999,
+                                    borderRadius:10, padding:"10px 12px",
                                     backgroundColor: lv.bg,
-                                    border: `1.5px solid ${isActive ? lv.color : lv.border}`,
-                                    fontSize:9, fontWeight:700, color: lv.color,
-                                    transform: isActive ? "scale(1.1)" : "scale(1)",
+                                    border:`${isActive ? 2.5 : 1.5}px solid ${isActive ? lv.color : lv.border}`,
+                                    minWidth:80, flexShrink:0,
+                                    transform: isActive ? "scale(1.08)" : "scale(1)",
                                     transition:"all 0.2s",
+                                    boxShadow: isActive ? `0 4px 16px ${lv.color}44` : "none",
                                 }}>
-                                    <span style={{ width:6, height:6, borderRadius:"50%", backgroundColor: lv.color, display:"inline-block", flexShrink:0 }} />
-                                    {lv.short}
+                                    <p style={{ fontSize:13, fontWeight:700, color:"#1f2937", margin:"0 0 3px", whiteSpace:"nowrap" }}>
+                                        {w.word}
+                                    </p>
+                                    <p style={{ fontSize:11, fontWeight:800, color:lv.color, margin:"0 0 5px" }}>
+                                        {lv.label}
+                                    </p>
+                                    <div style={{ height:4, background:"#e5e7eb", borderRadius:999, overflow:"hidden", marginBottom:3 }}>
+                                        <div style={{ height:"100%", width:lv.pct+"%", background:lv.color, borderRadius:999 }} />
+                                    </div>
+                                    <p style={{ fontSize:9, color:"#6b7280", margin:0 }}>{lv.tip}</p>
                                 </div>
                             );
                         })}
                     </div>
-                    <div style={{ display:"flex", justifyContent:"space-between", margin:"6px 0 4px" }}>
-                        <span style={{ fontSize:10, color:"#a78bfa" }}>← Earlier in speech</span>
-                        <span style={{ fontSize:10, color:"#a78bfa" }}>Later in speech →</span>
-                    </div>
                 </div>
             )}
 
-            {/* Footer */}
-            <div style={{ margin:"0 18px 14px", padding:"10px 14px", borderRadius:10, backgroundColor:"#ede9fe", border:"1px solid #c4b5fd" }}>
-                <p style={{ fontSize:10, color:"#4c1d95", lineHeight:1.7, margin:0 }}>
-                    <strong>Speaking guide:</strong> Each card shows one word and how loud it was spoken. LOUD = speak strongly, MEDIUM = normal voice, SOFT = lower your voice. The active card glows as the audio plays.
-                </p>
+            {status === "loading" && (
+                <div style={{ padding:"20px", textAlign:"center", color:"#7c3aed", fontSize:12 }}>
+                    ⏳ Analysing audio to detect volume levels...
+                </div>
+            )}
+
+            {/* Legend */}
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap", padding:"0 18px 10px" }}>
+                {[
+                    { bg:"#fef3c7", color:"#92400e", label:"🔊 LOUD — speak with full voice" },
+                    { bg:"#dbeafe", color:"#1e40af", label:"🔉 MEDIUM — normal voice" },
+                    { bg:"#f3f4f6", color:"#374151", label:"🔈 SOFT — lower your voice" },
+                ].map((l, i) => (
+                    <span key={i} style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:999, fontSize:10, fontWeight:600, backgroundColor:l.bg, color:l.color }}>
+                        {l.label}
+                    </span>
+                ))}
             </div>
         </motion.div>
     );
