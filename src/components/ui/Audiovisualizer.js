@@ -1,64 +1,47 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 
-function fftMags(signal) {
-    const N = signal.length;
-    const re = new Float32Array(N);
-    const im = new Float32Array(N);
-    for (let i = 0; i < N; i++)
-        re[i] = signal[i] * 0.5 * (1 - Math.cos((2 * Math.PI * i) / (N - 1)));
-    for (let i = 1, j = 0; i < N; i++) {
-        let bit = N >> 1;
-        for (; j & bit; bit >>= 1) j ^= bit;
-        j ^= bit;
-        if (i < j) { [re[i],re[j]]=[re[j],re[i]]; [im[i],im[j]]=[im[j],im[i]]; }
-    }
-    for (let len = 2; len <= N; len <<= 1) {
-        const ang = (-2*Math.PI)/len;
-        const wR = Math.cos(ang), wI = Math.sin(ang);
-        for (let i = 0; i < N; i += len) {
-            let cR = 1, cI = 0;
-            for (let j = 0; j < len/2; j++) {
-                const uR=re[i+j],uI=im[i+j];
-                const vR=re[i+j+len/2]*cR-im[i+j+len/2]*cI;
-                const vI=re[i+j+len/2]*cI+im[i+j+len/2]*cR;
-                re[i+j]=uR+vR; im[i+j]=uI+vI;
-                re[i+j+len/2]=uR-vR; im[i+j+len/2]=uI-vI;
-                [cR,cI]=[cR*wR-cI*wI,cR*wI+cI*wR];
-            }
-        }
-    }
-    const mags = new Float32Array(N/2);
-    let mx = 0;
-    for (let i = 0; i < N/2; i++) { mags[i]=Math.sqrt(re[i]*re[i]+im[i]*im[i])/N; if(mags[i]>mx) mx=mags[i]; }
-    if (mx > 0) for (let i = 0; i < N/2; i++) mags[i] /= mx;
-    return mags;
+function getVolLevel(amp) {
+    if (amp >= 0.65) return {
+        label: "🔊 LOUD",   short: "LOUD",
+        color: "#d97706",   bg: "#fef3c7", border: "#fcd34d",
+        tip:   "Speak with full, strong voice",
+        pct:   Math.min(100, Math.round(amp * 100)),
+    };
+    if (amp >= 0.35) return {
+        label: "🔉 MEDIUM", short: "MEDIUM",
+        color: "#1d4ed8",   bg: "#dbeafe", border: "#93c5fd",
+        tip:   "Normal, clear speaking voice",
+        pct:   Math.min(100, Math.round(amp * 100)),
+    };
+    return {
+        label: "🔈 SOFT",   short: "SOFT",
+        color: "#4b5563",   bg: "#f3f4f6", border: "#d1d5db",
+        tip:   "Gentle, quiet delivery",
+        pct:   Math.min(100, Math.round(amp * 100)),
+    };
 }
 
-const WIN_SEC = 1.2;
-const FFT_N   = 512;
-const N_BARS  = 48;
+const WIN_SEC = 1.4;
 
 export default function AudioVisualizer({
     audioURL, audioFeatures, isPlaying, currentTime, duration, language
 }) {
     const waveRef  = useRef(null);
-    const fftRef   = useRef(null);
     const wAnimRef = useRef(null);
-    const fAnimRef = useRef(null);
     const pcmRef   = useRef(null);
     const srRef    = useRef(22050);
 
-    const [status,  setStatus]  = useState("idle");
-    const [tab,     setTab]     = useState("waveform");
-    const [volLabel, setVol]    = useState("—");
-    const [waveH,   setWaveH]   = useState("—");
+    const [status, setStatus] = useState("idle");
+    const [tab,    setTab]    = useState("guide");
+    const [segs,   setSegs]   = useState([]);
 
-    // ── Decode audio ──────────────────────────────────────────────────────────
     useEffect(() => {
         if (!audioURL) return;
         pcmRef.current = null;
         setStatus("loading");
+        setSegs([]);
+
         const run = async () => {
             try {
                 const res     = await fetch(audioURL);
@@ -67,8 +50,28 @@ export default function AudioVisualizer({
                 const tmpCtx  = new (window.AudioContext || window.webkitAudioContext)();
                 const decoded = await tmpCtx.decodeAudioData(buf);
                 await tmpCtx.close();
-                srRef.current  = decoded.sampleRate;
-                pcmRef.current = decoded.getChannelData(0);
+
+                const sr  = decoded.sampleRate;
+                const pcm = decoded.getChannelData(0);
+                srRef.current  = sr;
+                pcmRef.current = pcm;
+
+                const segCount = 8;
+                const segDur   = duration / segCount;
+                const built    = [];
+                for (let i = 0; i < segCount; i++) {
+                    const t  = i * segDur;
+                    const s0 = Math.floor(t * sr);
+                    const sN = Math.floor((t + segDur) * sr);
+                    let   sum = 0, cnt = 0;
+                    for (let j = s0; j < Math.min(sN, pcm.length); j++) {
+                        sum += pcm[j] * pcm[j]; cnt++;
+                    }
+                    built.push({ t, dur: segDur, rms: cnt > 0 ? Math.sqrt(sum/cnt) : 0 });
+                }
+
+                const maxRms = Math.max(...built.map(s => s.rms), 0.001);
+                setSegs(built.map(s => ({ ...s, amp: s.rms / maxRms })));
                 setStatus("ready");
             } catch (e) {
                 console.warn("AudioVisualizer:", e.message);
@@ -76,12 +79,12 @@ export default function AudioVisualizer({
             }
         };
         run();
-    }, [audioURL]);
+    }, [audioURL, duration]);
 
     // ── Waveform draw ─────────────────────────────────────────────────────────
     useEffect(() => {
         const canvas = waveRef.current;
-        if (!canvas || tab !== "waveform") return;
+        if (!canvas || tab !== "wave") return;
 
         const draw = () => {
             const ctx = canvas.getContext("2d");
@@ -89,26 +92,22 @@ export default function AudioVisualizer({
             const H   = canvas.height;
             const mid = H / 2;
             ctx.clearRect(0, 0, W, H);
-
-            // Background
             ctx.fillStyle = "#faf5ff";
             ctx.fillRect(0, 0, W, H);
 
-            // Horizontal zone labels — background bands
-            ctx.fillStyle = "rgba(109,40,217,0.04)";
-            ctx.fillRect(0, 0, W, mid - 10);
-            ctx.fillStyle = "rgba(236,72,153,0.04)";
-            ctx.fillRect(0, mid + 10, W, mid - 10);
-
-            // Center line
-            ctx.strokeStyle = "rgba(124,58,237,0.25)";
-            ctx.lineWidth   = 1.5;
-            ctx.setLineDash([5, 5]);
-            ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke();
-            ctx.setLineDash([]);
-
             const pcm = pcmRef.current;
             const sr  = srRef.current;
+
+            // Color background per segment
+            if (duration > 0) {
+                segs.forEach(w => {
+                    const lv    = getVolLevel(w.amp);
+                    const relSt = w.t / duration;
+                    const relEn = (w.t + w.dur) / duration;
+                    ctx.fillStyle = lv.bg + "99";
+                    ctx.fillRect(relSt * W, 0, (relEn - relSt) * W, H);
+                });
+            }
 
             if (pcm && status === "ready" && duration > 0) {
                 const half   = WIN_SEC / 2;
@@ -123,150 +122,80 @@ export default function AudioVisualizer({
                 for (let i = s0; i < sN; i += 4)
                     if (Math.abs(pcm[Math.min(i, total-1)]) > mx)
                         mx = Math.abs(pcm[Math.min(i, total-1)]);
-                mx = Math.max(mx, 0.01);
 
-                // Purple fill — above center
-                ctx.fillStyle = "rgba(109,40,217,0.18)";
+                ctx.strokeStyle = "rgba(124,58,237,0.2)";
+                ctx.lineWidth   = 1; ctx.setLineDash([4, 4]);
+                ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.fillStyle = "rgba(109,40,217,0.15)";
                 ctx.beginPath(); ctx.moveTo(0, mid);
                 for (let x = 0; x < W; x++) {
                     const s = s0 + Math.floor((x/W)*range);
                     const v = pcm[Math.min(s, total-1)] / mx;
-                    ctx.lineTo(x, mid - Math.max(0, v) * (mid - 14));
+                    ctx.lineTo(x, mid - Math.max(0, v) * (mid-12));
                 }
                 ctx.lineTo(W, mid); ctx.closePath(); ctx.fill();
 
-                // Pink fill — below center
-                ctx.fillStyle = "rgba(236,72,153,0.12)";
+                ctx.fillStyle = "rgba(236,72,153,0.1)";
                 ctx.beginPath(); ctx.moveTo(0, mid);
                 for (let x = 0; x < W; x++) {
                     const s = s0 + Math.floor((x/W)*range);
                     const v = pcm[Math.min(s, total-1)] / mx;
-                    ctx.lineTo(x, mid - Math.min(0, v) * (mid - 14));
+                    ctx.lineTo(x, mid - Math.min(0, v) * (mid-12));
                 }
                 ctx.lineTo(W, mid); ctx.closePath(); ctx.fill();
 
-                // Wave line
-                ctx.strokeStyle = "#7c3aed";
-                ctx.lineWidth   = 2;
+                ctx.strokeStyle = "#7c3aed"; ctx.lineWidth = 2;
                 ctx.beginPath();
                 for (let x = 0; x < W; x++) {
                     const s = s0 + Math.floor((x/W)*range);
                     const v = pcm[Math.min(s, total-1)] / mx;
-                    const y = mid - v * (mid - 14);
+                    const y = mid - v * (mid-12);
                     x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
                 }
                 ctx.stroke();
 
-                // Playhead
+                // Volume labels on wave
+                segs.forEach(w => {
+                    const lv    = getVolLevel(w.amp);
+                    const relMid = (w.t + w.dur/2) / duration;
+                    const wx    = relMid * W;
+                    ctx.fillStyle   = lv.color + "cc";
+                    ctx.font        = "bold 9px sans-serif";
+                    ctx.textAlign   = "center";
+                    ctx.fillText(lv.short, wx, H - 4);
+                });
+
                 const px = W / 2;
-                ctx.strokeStyle = "#ef4444";
-                ctx.lineWidth   = 2.5;
-                ctx.beginPath(); ctx.moveTo(px, 2); ctx.lineTo(px, H - 2); ctx.stroke();
+                ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 2.5;
+                ctx.beginPath(); ctx.moveTo(px, 2); ctx.lineTo(px, H-2); ctx.stroke();
 
-                // Red dot on wave
-                const cs  = Math.floor(currentTime * sr);
-                const cv  = pcm[Math.min(cs, total-1)] / mx;
-                const cy  = mid - cv * (mid - 14);
-                ctx.fillStyle   = "#ef4444";
+                const cs = Math.floor(currentTime * sr);
+                const cv = pcm[Math.min(cs, total-1)] / mx;
+                const cy = mid - cv * (mid-12);
+                ctx.fillStyle = "#ef4444";
                 ctx.beginPath(); ctx.arc(px, cy, 5, 0, Math.PI*2); ctx.fill();
-                ctx.strokeStyle = "#fff";
-                ctx.lineWidth   = 1.5;
+                ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5;
                 ctx.beginPath(); ctx.arc(px, cy, 5, 0, Math.PI*2); ctx.stroke();
-
-                // Update stats
-                const vol = Math.abs(cv);
-                setVol(vol > 0.65 ? "🔊 Loud" : vol > 0.3 ? "🔉 Medium" : "🔈 Soft");
-                setWaveH(vol > 0.65 ? "Very tall" : vol > 0.3 ? "Medium" : "Flat / pause");
             }
 
-            // Plain English axis labels
-            ctx.font      = "bold 10px sans-serif";
-            ctx.textAlign = "left";
-            ctx.fillStyle = "rgba(109,40,217,0.7)";
-            ctx.fillText("LOUD ↑", 5, 16);
-            ctx.fillStyle = "rgba(109,40,217,0.4)";
-            ctx.fillText("center —", 5, mid + 4);
-            ctx.fillStyle = "rgba(236,72,153,0.6)";
-            ctx.fillText("loud ↓", 5, H - 5);
+            ctx.font = "bold 9px sans-serif"; ctx.textAlign = "left";
+            ctx.fillStyle = "rgba(109,40,217,0.5)";
+            ctx.fillText("LOUD ↑", 4, 13);
+            ctx.fillText("SOFT ↓", 4, H - 4);
 
             wAnimRef.current = requestAnimationFrame(draw);
         };
 
         wAnimRef.current = requestAnimationFrame(draw);
         return () => { if (wAnimRef.current) cancelAnimationFrame(wAnimRef.current); };
-    }, [status, currentTime, duration, tab]);
-
-    // ── Spectrum draw ─────────────────────────────────────────────────────────
-    useEffect(() => {
-        const canvas = fftRef.current;
-        if (!canvas || tab !== "spectrum") return;
-
-        const draw = () => {
-            const ctx = canvas.getContext("2d");
-            const W   = canvas.width;
-            const H   = canvas.height;
-            ctx.clearRect(0, 0, W, H);
-            ctx.fillStyle = "#faf5ff";
-            ctx.fillRect(0, 0, W, H);
-
-            const pcm = pcmRef.current;
-            const sr  = srRef.current;
-            let   bars = null;
-
-            if (pcm && status === "ready") {
-                const s0    = Math.max(0, Math.floor(currentTime * sr) - FFT_N/2);
-                const slice = new Float32Array(FFT_N);
-                for (let i = 0; i < FFT_N; i++) slice[i] = pcm[Math.min(s0+i, pcm.length-1)];
-                const mags = fftMags(slice);
-                const step = Math.floor(mags.length / N_BARS);
-                bars = new Array(N_BARS).fill(0).map((_, b) => {
-                    let s = 0;
-                    for (let j = 0; j < step; j++) s += mags[b*step+j] || 0;
-                    return s / step;
-                });
-            } else if (audioFeatures?.mel) {
-                const mel    = audioFeatures.mel.slice(0, N_BARS);
-                const melMin = Math.min(...mel);
-                const melMax = Math.max(...mel) || 1;
-                bars = mel.map(v => Math.max(0.03, (v-melMin)/(melMax-melMin)));
-            }
-
-            if (bars) {
-                const barW = W / bars.length;
-                for (let i = 0; i < bars.length; i++) {
-                    const barH = Math.max(3, bars[i] * (H - 8));
-                    const t    = i / bars.length;
-                    const r    = Math.round(110 + t*145);
-                    const g    = Math.round(40  + t*20);
-                    const b    = Math.round(210 - t*50);
-                    ctx.fillStyle = `rgb(${r},${g},${b})`;
-                    ctx.beginPath();
-                    if (ctx.roundRect) ctx.roundRect(i*barW+1, H-barH, barW-2, barH, 2);
-                    else ctx.rect(i*barW+1, H-barH, barW-2, barH);
-                    ctx.fill();
-                }
-            }
-
-            // Labels
-            ctx.font      = "bold 10px sans-serif";
-            ctx.textAlign = "left";
-            ctx.fillStyle = "rgba(109,40,217,0.6)";
-            ctx.fillText("Deep sounds", 4, H-4);
-            ctx.textAlign = "right";
-            ctx.fillText("High-pitched sounds", W-4, H-4);
-
-            fAnimRef.current = requestAnimationFrame(draw);
-        };
-
-        fAnimRef.current = requestAnimationFrame(draw);
-        return () => { if (fAnimRef.current) cancelAnimationFrame(fAnimRef.current); };
-    }, [status, currentTime, duration, audioFeatures, tab]);
+    }, [status, currentTime, duration, segs, tab]);
 
     if (!audioFeatures && !audioURL) return null;
 
-    const { rms = 0 } = audioFeatures || {};
-    const loudness  = rms > 0.05 ? "Loud"   : rms > 0.02 ? "Medium" : "Soft";
-    const loudColor = rms > 0.05 ? "#15803d": rms > 0.02 ? "#b45309": "#1d4ed8";
+    const nowSeg  = segs.find(w => currentTime >= w.t && currentTime < w.t + w.dur);
+    const nowVol  = nowSeg ? getVolLevel(nowSeg.amp) : null;
 
     const tabBtn = (t, label) => ({
         padding: "5px 14px", borderRadius: 999, fontSize: 11, fontWeight: 700,
@@ -284,42 +213,103 @@ export default function AudioVisualizer({
             style={{ borderRadius: 16, border: "1.5px solid #e0d7f5", overflow: "hidden", backgroundColor: "#f8f5ff" }}
         >
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 18px", borderBottom: "1px solid #e0d7f5", backgroundColor: "#ede9fe" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: "#ddd6fe", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>📊</div>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 18px", borderBottom:"1px solid #e0d7f5", backgroundColor:"#ede9fe" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <div style={{ width:28, height:28, borderRadius:8, backgroundColor:"#ddd6fe", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>📊</div>
                     <div>
-                        <p style={{ fontSize: 11, fontWeight: 700, color: "#3730a3", margin: 0 }}>Voice Analysis</p>
-                        <p style={{ fontSize: 9, color: "#7c3aed", margin: "2px 0 0" }}>
-                            {status === "loading" ? "⏳ Reading the audio..."
-                             : status === "ready"  ? `🔴 Live · moves with voice · ${language || ""}`
-                             :                       `Based on AI model · ${language || ""}`}
+                        <p style={{ fontSize:11, fontWeight:700, color:"#3730a3", margin:0 }}>Voice Volume Guide</p>
+                        <p style={{ fontSize:9, color:"#7c3aed", margin:"2px 0 0" }}>
+                            {status === "loading" ? "⏳ Reading audio..."
+                             : status === "ready"  ? `🔴 Live · ${language || ""}`
+                             :                       language || ""}
                         </p>
                     </div>
                 </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                    <button style={tabBtn("waveform")} onClick={() => setTab("waveform")}>〰 Voice wave</button>
-                    <button style={tabBtn("spectrum")} onClick={() => setTab("spectrum")}>▦ Frequencies</button>
+                <div style={{ display:"flex", gap:6 }}>
+                    <button style={tabBtn("guide")} onClick={() => setTab("guide")}>📋 Volume guide</button>
+                    <button style={tabBtn("wave")}  onClick={() => setTab("wave")}>〰 Waveform</button>
                 </div>
             </div>
 
-            {/* Waveform */}
-            {tab === "waveform" && (
-                <div style={{ padding: "12px 18px 0" }}>
-                    <canvas ref={waveRef} width={560} height={130} style={{ width: "100%", height: 130, display: "block", borderRadius: 8 }} />
-                    <div style={{ display: "flex", justifyContent: "space-between", margin: "5px 0 10px", padding: "0 2px" }}>
-                        <span style={{ fontSize: 10, color: "#a78bfa" }}>← Earlier in the speech</span>
-                        <span style={{ fontSize: 10, color: "#ef4444", fontWeight: 700 }}>▼ Playing now</span>
-                        <span style={{ fontSize: 10, color: "#a78bfa" }}>Later in the speech →</span>
-                    </div>
+            {/* ── GUIDE TAB ── */}
+            {tab === "guide" && (
+                <div style={{ padding:"14px 18px" }}>
 
-                    {/* Legend — plain English */}
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                    {/* Now playing banner */}
+                    {nowVol && (
+                        <motion.div
+                            key={nowSeg?.t}
+                            initial={{ opacity: 0, scale: 0.97 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            style={{ padding:"12px 14px", borderRadius:12, backgroundColor: nowVol.bg, border:`2px solid ${nowVol.border}`, marginBottom:14 }}
+                        >
+                            <p style={{ fontSize:10, fontWeight:700, color: nowVol.color, textTransform:"uppercase", margin:"0 0 6px" }}>Right now →</p>
+                            <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+                                <p style={{ fontSize:22, fontWeight:800, color:"#111827", margin:0 }}>{nowVol.label}</p>
+                                <p style={{ fontSize:12, color:"#374151", margin:0 }}>{nowVol.tip}</p>
+                                <div style={{ flex:1, minWidth:80, height:10, background:"#e5e7eb", borderRadius:999, overflow:"hidden" }}>
+                                    <motion.div
+                                        style={{ height:"100%", borderRadius:999, backgroundColor: nowVol.color }}
+                                        animate={{ width: nowVol.pct + "%" }}
+                                        transition={{ duration: 0.2 }}
+                                    />
+                                </div>
+                                <span style={{ fontSize:13, fontWeight:700, color: nowVol.color }}>{nowVol.pct}%</span>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* Segment cards */}
+                    {status === "ready" && segs.length > 0 && (
+                        <div>
+                            <p style={{ fontSize:10, fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.08em", margin:"0 0 10px" }}>
+                                Volume at each part of the speech
+                            </p>
+                            <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:14 }}>
+                                {segs.map((w, i) => {
+                                    const lv       = getVolLevel(w.amp);
+                                    const isActive = currentTime >= w.t && currentTime < w.t + w.dur;
+                                    return (
+                                        <div key={i} style={{
+                                            borderRadius:10, padding:"10px 12px",
+                                            backgroundColor: lv.bg,
+                                            border: `${isActive ? 2.5 : 1.5}px solid ${lv.border}`,
+                                            minWidth:70, flex:"1 1 70px",
+                                            transform: isActive ? "scale(1.06)" : "scale(1)",
+                                            transition: "all 0.2s",
+                                            boxShadow: isActive ? `0 4px 14px ${lv.color}44` : "none",
+                                        }}>
+                                            <p style={{ fontSize:9, fontWeight:600, color:"#6b7280", margin:"0 0 4px" }}>
+                                                {w.t.toFixed(1)}s – {(w.t+w.dur).toFixed(1)}s
+                                            </p>
+                                            <p style={{ fontSize:13, fontWeight:800, color: lv.color, margin:"0 0 5px" }}>
+                                                {lv.label}
+                                            </p>
+                                            <div style={{ height:5, background:"#e5e7eb", borderRadius:999, overflow:"hidden" }}>
+                                                <div style={{ height:"100%", width: lv.pct+"%", background: lv.color, borderRadius:999 }} />
+                                            </div>
+                                            <p style={{ fontSize:9, color:"#6b7280", margin:"3px 0 0" }}>{lv.pct}%</p>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {status === "loading" && (
+                        <div style={{ padding:"20px 0", textAlign:"center", color:"#7c3aed", fontSize:12 }}>
+                            ⏳ Analysing audio volume levels...
+                        </div>
+                    )}
+
+                    {/* Legend */}
+                    <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                         {[
-                            { color: "#ede9fe", text: "#5b21b6", label: "🔵 Big wave = loud word" },
-                            { color: "#fce7f3", text: "#9d174d", label: "🔴 Tiny wave = soft / quiet" },
-                            { color: "#f0fdf4", text: "#166534", label: "🟢 Flat line = silence / pause" },
+                            { bg:"#fef3c7", color:"#92400e", label:"🔊 LOUD — speak with full voice" },
+                            { bg:"#dbeafe", color:"#1e40af", label:"🔉 MEDIUM — normal speaking voice" },
+                            { bg:"#f3f4f6", color:"#374151", label:"🔈 SOFT — gentle, quiet" },
                         ].map((l, i) => (
-                            <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 999, fontSize: 10, fontWeight: 500, backgroundColor: l.color, color: l.text }}>
+                            <span key={i} style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:999, fontSize:10, fontWeight:600, backgroundColor:l.bg, color:l.color }}>
                                 {l.label}
                             </span>
                         ))}
@@ -327,19 +317,26 @@ export default function AudioVisualizer({
                 </div>
             )}
 
-            {/* Spectrum */}
-            {tab === "spectrum" && (
-                <div style={{ padding: "12px 18px 0" }}>
-                    <p style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 6px" }}>
-                        Which sound frequencies are active right now
+            {/* ── WAVE TAB ── */}
+            {tab === "wave" && (
+                <div style={{ padding:"12px 18px" }}>
+                    <p style={{ fontSize:9, fontWeight:700, color:"#7c3aed", textTransform:"uppercase", letterSpacing:"0.1em", margin:"0 0 8px" }}>
+                        Tall wave = loud · Flat = soft · Color shows volume level
                     </p>
-                    <canvas ref={fftRef} width={560} height={130} style={{ width: "100%", height: 130, display: "block", borderRadius: 8 }} />
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "8px 0 12px" }}>
+                    <canvas ref={waveRef} width={560} height={130}
+                        style={{ width:"100%", height:130, display:"block", borderRadius:8 }} />
+                    <div style={{ display:"flex", justifyContent:"space-between", margin:"5px 0 10px" }}>
+                        <span style={{ fontSize:10, color:"#a78bfa" }}>← Earlier</span>
+                        <span style={{ fontSize:10, color:"#ef4444", fontWeight:700 }}>▼ Now</span>
+                        <span style={{ fontSize:10, color:"#a78bfa" }}>Later →</span>
+                    </div>
+                    <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                         {[
-                            { color: "#ede9fe", text: "#5b21b6", label: "Tall bar = strong frequency present" },
-                            { color: "#f0fdf4", text: "#166534", label: "Short bar = weak or absent" },
+                            { bg:"#fef3c7", color:"#92400e", label:"🔊 LOUD section" },
+                            { bg:"#dbeafe", color:"#1e40af", label:"🔉 MEDIUM section" },
+                            { bg:"#f3f4f6", color:"#374151", label:"🔈 SOFT section" },
                         ].map((l, i) => (
-                            <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 999, fontSize: 10, fontWeight: 500, backgroundColor: l.color, color: l.text }}>
+                            <span key={i} style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:999, fontSize:10, fontWeight:600, backgroundColor:l.bg, color:l.color }}>
                                 {l.label}
                             </span>
                         ))}
@@ -347,26 +344,10 @@ export default function AudioVisualizer({
                 </div>
             )}
 
-            {/* Stats — plain English */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0, margin: "0 18px 14px", borderRadius: 12, overflow: "hidden", border: "1px solid #e0d7f5" }}>
-                <div style={{ padding: "10px 8px", textAlign: "center", backgroundColor: "#faf5ff" }}>
-                    <p style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", margin: "0 0 4px" }}>Overall volume</p>
-                    <p style={{ fontSize: 14, fontWeight: 800, color: loudColor, margin: 0 }}>{loudness}</p>
-                </div>
-                <div style={{ padding: "10px 8px", textAlign: "center", backgroundColor: "#faf5ff", borderLeft: "1px solid #e0d7f5", borderRight: "1px solid #e0d7f5" }}>
-                    <p style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", margin: "0 0 4px" }}>Right now</p>
-                    <p id="av-vol" style={{ fontSize: 14, fontWeight: 800, color: "#6d28d9", margin: 0 }}>{volLabel}</p>
-                </div>
-                <div style={{ padding: "10px 8px", textAlign: "center", backgroundColor: "#faf5ff" }}>
-                    <p style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", margin: "0 0 4px" }}>Wave size</p>
-                    <p id="av-wh" style={{ fontSize: 14, fontWeight: 800, color: "#1d4ed8", margin: 0 }}>{waveH}</p>
-                </div>
-            </div>
-
-            {/* Plain English explanation */}
-            <div style={{ margin: "0 18px 14px", padding: "10px 14px", borderRadius: 10, backgroundColor: "#ede9fe", border: "1px solid #c4b5fd" }}>
-                <p style={{ fontSize: 10, color: "#4c1d95", lineHeight: 1.7, margin: 0 }}>
-                    <strong>How to read this:</strong> Each wave shows the voice. When a word is spoken loudly, the wave goes very high and low. Soft words stay close to the center line. Silence shows a flat line. The red line shows exactly where in the sentence we are right now.
+            {/* Footer */}
+            <div style={{ margin:"0 18px 14px", padding:"10px 14px", borderRadius:10, backgroundColor:"#ede9fe", border:"1px solid #c4b5fd" }}>
+                <p style={{ fontSize:10, color:"#4c1d95", lineHeight:1.7, margin:0 }}>
+                    <strong>How to use this:</strong> The highlighted card shows how loud the voice is right now. Use this as a speaking guide — LOUD means speak with full voice, MEDIUM means normal voice, SOFT means lower your voice. The waveform tab shows tall waves for loud parts and flat lines for soft parts.
                 </p>
             </div>
         </motion.div>

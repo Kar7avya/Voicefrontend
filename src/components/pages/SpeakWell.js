@@ -1,7 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 const ML_URL      = process.env.REACT_APP_ML_URL      || "";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
+
+const supabase = createClient(
+  process.env.REACT_APP_SUPABASE_URL,
+  process.env.REACT_APP_SUPABASE_ANON_KEY
+);
 
 const HAND_CONN = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
 const POSE_CONN = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
@@ -67,7 +73,6 @@ function GroqSection({ groq }) {
   if (!groq || !groq.groq_summary) return null;
   return (
     <div style={{ padding:"20px 24px", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
-      {/* Header */}
       <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
         <div style={{ width:24, height:24, borderRadius:8,
           background:"linear-gradient(135deg,#0a84ff,#bf5af2)",
@@ -78,15 +83,11 @@ function GroqSection({ groq }) {
           AI Coach · Groq Analysis
         </p>
       </div>
-
-      {/* Summary */}
       <p style={{ fontSize:13, color:"rgba(255,255,255,0.8)", lineHeight:1.65,
         marginBottom:16, fontStyle:"italic",
         borderLeft:"2px solid #0a84ff", paddingLeft:12 }}>
         {groq.groq_summary}
       </p>
-
-      {/* Analysis blocks */}
       {[
         ["Body & Posture", groq.groq_body_analysis],
         ["Gesture Patterns", groq.groq_gesture_analysis],
@@ -95,20 +96,14 @@ function GroqSection({ groq }) {
       ].filter(([,v])=>v).map(([label, text])=>(
         <div key={label} style={{ marginBottom:12 }}>
           <p style={{ fontSize:10, color:"rgba(255,255,255,0.3)",
-            textTransform:"uppercase", letterSpacing:".05em", marginBottom:5 }}>
-            {label}
-          </p>
+            textTransform:"uppercase", letterSpacing:".05em", marginBottom:5 }}>{label}</p>
           <p style={{ fontSize:12, color:"rgba(255,255,255,0.6)", lineHeight:1.6 }}>{text}</p>
         </div>
       ))}
-
-      {/* Strengths */}
       {groq.groq_strengths?.length > 0 && (
         <div style={{ marginBottom:12 }}>
           <p style={{ fontSize:10, color:"rgba(255,255,255,0.3)",
-            textTransform:"uppercase", letterSpacing:".05em", marginBottom:8 }}>
-            AI Strengths
-          </p>
+            textTransform:"uppercase", letterSpacing:".05em", marginBottom:8 }}>AI Strengths</p>
           {groq.groq_strengths.map((s,i)=>(
             <div key={i} style={{ display:"flex", gap:8, alignItems:"flex-start", marginBottom:5 }}>
               <span style={{ color:"#30d158", flexShrink:0, fontSize:13 }}>✦</span>
@@ -117,14 +112,10 @@ function GroqSection({ groq }) {
           ))}
         </div>
       )}
-
-      {/* Improvements */}
       {groq.groq_improvements?.length > 0 && (
         <div style={{ marginBottom:12 }}>
           <p style={{ fontSize:10, color:"rgba(255,255,255,0.3)",
-            textTransform:"uppercase", letterSpacing:".05em", marginBottom:8 }}>
-            AI Improvements
-          </p>
+            textTransform:"uppercase", letterSpacing:".05em", marginBottom:8 }}>AI Improvements</p>
           {groq.groq_improvements.map((s,i)=>(
             <div key={i} style={{ display:"flex", gap:8, alignItems:"flex-start", marginBottom:5 }}>
               <span style={{ color:"#ffd60a", flexShrink:0, fontSize:13 }}>→</span>
@@ -133,14 +124,10 @@ function GroqSection({ groq }) {
           ))}
         </div>
       )}
-
-      {/* Drills */}
       {groq.groq_drills?.length > 0 && (
         <div style={{ marginBottom:12 }}>
           <p style={{ fontSize:10, color:"rgba(255,255,255,0.3)",
-            textTransform:"uppercase", letterSpacing:".05em", marginBottom:8 }}>
-            Practice Drills
-          </p>
+            textTransform:"uppercase", letterSpacing:".05em", marginBottom:8 }}>Practice Drills</p>
           {groq.groq_drills.map((d,i)=>(
             <div key={i} style={{ background:"rgba(10,132,255,0.08)",
               border:"1px solid rgba(10,132,255,0.18)",
@@ -150,15 +137,11 @@ function GroqSection({ groq }) {
           ))}
         </div>
       )}
-
-      {/* Next session goal */}
       {groq.groq_next_session_goal && (
         <div style={{ background:"linear-gradient(135deg,rgba(10,132,255,0.1),rgba(191,90,242,0.1))",
           border:"1px solid rgba(10,132,255,0.2)", borderRadius:12, padding:"12px 14px" }}>
           <p style={{ fontSize:10, color:"#0a84ff",
-            textTransform:"uppercase", letterSpacing:".05em", marginBottom:5 }}>
-            Next Session Goal
-          </p>
+            textTransform:"uppercase", letterSpacing:".05em", marginBottom:5 }}>Next Session Goal</p>
           <p style={{ fontSize:13, color:"rgba(255,255,255,0.8)", lineHeight:1.55 }}>
             {groq.groq_next_session_goal}
           </p>
@@ -173,7 +156,6 @@ function DeepResultModal({ data, onClose, onHistory }) {
   if (!data) return null;
   const m = data.metrics || {};
   const gestureDist = data.gesture_distribution || {};
-
   const MetricBox = ({ label, value, unit="" }) => (
     <div style={{ background:"rgba(255,255,255,0.05)", borderRadius:12,
       padding:"12px 10px", textAlign:"center" }}>
@@ -184,7 +166,6 @@ function DeepResultModal({ data, onClose, onHistory }) {
         textTransform:"uppercase", letterSpacing:".05em" }}>{label}</p>
     </div>
   );
-
   return (
     <div style={{ position:"fixed", inset:0, zIndex:200,
       background:"rgba(0,0,0,0.8)", backdropFilter:"blur(20px)",
@@ -194,8 +175,6 @@ function DeepResultModal({ data, onClose, onHistory }) {
           border:"1px solid rgba(255,255,255,0.08)",
           borderRadius:24, overflow:"hidden",
           animation:"popIn .3s cubic-bezier(.34,1.56,.64,1)" }}>
-
-          {/* Header */}
           <div style={{ padding:"28px 24px 20px", textAlign:"center",
             borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
             <ScoreRing score={data.avg_score} size={120}/>
@@ -205,8 +184,6 @@ function DeepResultModal({ data, onClose, onHistory }) {
               {data.total_frames} frames · {data.duration_seconds}s · {data.fps_actual} fps
             </p>
           </div>
-
-          {/* Score distribution */}
           <div style={{ padding:"20px 24px", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
             <p style={{ fontSize:11, color:"rgba(255,255,255,0.35)",
               textTransform:"uppercase", letterSpacing:".06em", marginBottom:10 }}>
@@ -229,8 +206,6 @@ function DeepResultModal({ data, onClose, onHistory }) {
               ))}
             </div>
           </div>
-
-          {/* Performance metrics */}
           <div style={{ padding:"20px 24px", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
             <p style={{ fontSize:11, color:"rgba(255,255,255,0.35)",
               textTransform:"uppercase", letterSpacing:".06em", marginBottom:12 }}>
@@ -245,8 +220,6 @@ function DeepResultModal({ data, onClose, onHistory }) {
               <MetricBox label="Motion pace" value={m.avg_wrist_velocity ? (m.avg_wrist_velocity<0.005?"Static":m.avg_wrist_velocity>0.05?"Fast":"Good") : null}/>
             </div>
           </div>
-
-          {/* Gesture breakdown */}
           <div style={{ padding:"20px 24px", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
             <p style={{ fontSize:11, color:"rgba(255,255,255,0.35)",
               textTransform:"uppercase", letterSpacing:".06em", marginBottom:12 }}>
@@ -272,14 +245,10 @@ function DeepResultModal({ data, onClose, onHistory }) {
               ))}
             </div>
           </div>
-
-          {/* Rule-based strengths */}
           {data.strengths?.length > 0 && (
             <div style={{ padding:"20px 24px", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
               <p style={{ fontSize:11, color:"rgba(255,255,255,0.35)",
-                textTransform:"uppercase", letterSpacing:".06em", marginBottom:10 }}>
-                Strengths
-              </p>
+                textTransform:"uppercase", letterSpacing:".06em", marginBottom:10 }}>Strengths</p>
               {data.strengths.map((s,i)=>(
                 <div key={i} style={{ display:"flex", gap:10, alignItems:"flex-start", marginBottom:7 }}>
                   <span style={{ color:"#30d158", fontSize:14, flexShrink:0 }}>✓</span>
@@ -288,14 +257,10 @@ function DeepResultModal({ data, onClose, onHistory }) {
               ))}
             </div>
           )}
-
-          {/* Rule-based coaching */}
           {(data.coaching?.length>0 || data.issues?.length>0) && (
             <div style={{ padding:"20px 24px", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
               <p style={{ fontSize:11, color:"rgba(255,255,255,0.35)",
-                textTransform:"uppercase", letterSpacing:".06em", marginBottom:10 }}>
-                Coaching
-              </p>
+                textTransform:"uppercase", letterSpacing:".06em", marginBottom:10 }}>Coaching</p>
               {data.issues?.map((s,i)=>(
                 <div key={`i${i}`} style={{ display:"flex", gap:10, alignItems:"flex-start", marginBottom:7 }}>
                   <span style={{ color:"#ff453a", fontSize:14, flexShrink:0 }}>!</span>
@@ -310,11 +275,7 @@ function DeepResultModal({ data, onClose, onHistory }) {
               ))}
             </div>
           )}
-
-          {/* ✅ Groq AI Analysis */}
           <GroqSection groq={data.groq_analysis}/>
-
-          {/* Buttons */}
           <div style={{ padding:"20px 24px", display:"flex", gap:10 }}>
             <button onClick={onHistory} style={{
               flex:1, height:46, borderRadius:14,
@@ -338,28 +299,36 @@ function DeepResultModal({ data, onClose, onHistory }) {
 }
 
 // ── History View ──────────────────────────────────────────────────
-function HistoryView({ onBack }) {
+function HistoryView({ onBack, userId }) {
   const [sessions,  setSessions]  = useState([]);
   const [stats,     setStats]     = useState(null);
   const [loading,   setLoading]   = useState(true);
   const [expanded,  setExpanded]  = useState(null);
 
   useEffect(()=>{
+    if (!userId) return;
     (async()=>{
       try {
         const [sr,st] = await Promise.all([
-          fetch(`${BACKEND_URL}/api/speakwell/sessions`).then(r=>r.json()),
-          fetch(`${BACKEND_URL}/api/speakwell/stats`).then(r=>r.json()),
+          fetch(`${BACKEND_URL}/api/speakwell/sessions`, {
+            headers: { "x-user-id": userId }
+          }).then(r=>r.json()),
+          fetch(`${BACKEND_URL}/api/speakwell/stats`, {
+            headers: { "x-user-id": userId }
+          }).then(r=>r.json()),
         ]);
         setSessions(sr.sessions||[]);
         setStats(st.stats||null);
       } catch{}
       setLoading(false);
     })();
-  },[]);
+  },[userId]);
 
   const del = async id => {
-    await fetch(`${BACKEND_URL}/api/speakwell/sessions/${id}`,{method:"DELETE"});
+    await fetch(`${BACKEND_URL}/api/speakwell/sessions/${id}`, {
+      method:"DELETE",
+      headers: { "x-user-id": userId }
+    });
     setSessions(p=>p.filter(s=>s.id!==id));
   };
 
@@ -388,8 +357,7 @@ function HistoryView({ onBack }) {
 
       <div style={{ maxWidth:680, margin:"0 auto", padding:"24px 16px" }}>
         {stats && (
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)",
-            gap:8, marginBottom:24 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginBottom:24 }}>
             {[["Sessions",stats.total_sessions??0],["Avg",stats.overall_avg??"—"],
               ["Best",stats.best_score??"—"],["Minutes",stats.total_minutes?`${stats.total_minutes}m`:"0m"]
             ].map(([l,v])=>(
@@ -429,7 +397,6 @@ function HistoryView({ onBack }) {
                 <div key={s.id} style={{ background:"rgba(255,255,255,0.05)",
                   border:"1px solid rgba(255,255,255,0.08)",
                   borderRadius:18, overflow:"hidden" }}>
-                  {/* Main row */}
                   <div style={{ padding:"18px 20px" }}>
                     <div style={{ display:"flex", justifyContent:"space-between",
                       alignItems:"flex-start", marginBottom:10 }}>
@@ -448,7 +415,6 @@ function HistoryView({ onBack }) {
                       <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
                         <span style={{ fontSize:12, fontWeight:700,
                           color:rc[s.rating]||"#fff" }}>{s.rating}</span>
-                        {/* AI badge if groq analysis exists */}
                         {groq?.groq_summary && (
                           <span style={{ fontSize:10, fontWeight:700,
                             background:"linear-gradient(135deg,#0a84ff,#bf5af2)",
@@ -464,23 +430,18 @@ function HistoryView({ onBack }) {
                         </button>
                       </div>
                     </div>
-
-                    {/* Score bar */}
                     <div style={{ height:4, borderRadius:4, overflow:"hidden",
                       display:"flex", background:"rgba(255,255,255,0.06)", marginBottom:6 }}>
                       <div style={{ width:`${s.good_percent}%`,background:"#30d158",height:"100%" }}/>
                       <div style={{ width:`${s.warn_percent}%`,background:"#ffd60a",height:"100%" }}/>
                       <div style={{ width:`${s.bad_percent}%`, background:"#ff453a",height:"100%" }}/>
                     </div>
-                    <div style={{ display:"flex", gap:12, fontSize:11,
-                      color:"rgba(255,255,255,0.25)" }}>
+                    <div style={{ display:"flex", gap:12, fontSize:11, color:"rgba(255,255,255,0.25)" }}>
                       <span>{s.good_percent}% good</span>
                       <span>{s.warn_percent}% warn</span>
                       <span>{s.bad_percent}% poor</span>
                       <span style={{ marginLeft:"auto" }}>{s.total_frames} frames</span>
                     </div>
-
-                    {/* Groq summary preview */}
                     {groq?.groq_summary && !isExp && (
                       <p style={{ marginTop:10, fontSize:12,
                         color:"rgba(255,255,255,0.4)", lineHeight:1.5,
@@ -489,7 +450,6 @@ function HistoryView({ onBack }) {
                         ✦ {groq.groq_summary}
                       </p>
                     )}
-
                     {da && (
                       <button onClick={()=>setExpanded(isExp?null:s.id)} style={{
                         marginTop:12, background:"rgba(10,132,255,0.1)",
@@ -501,17 +461,11 @@ function HistoryView({ onBack }) {
                       </button>
                     )}
                   </div>
-
-                  {/* Expanded analysis */}
                   {da && isExp && (
                     <div style={{ borderTop:"1px solid rgba(255,255,255,0.06)" }}>
-
-                      {/* Metrics */}
                       <div style={{ padding:"20px" }}>
                         <p style={{ fontSize:10, color:"rgba(255,255,255,0.3)",
-                          textTransform:"uppercase", letterSpacing:".06em", marginBottom:10 }}>
-                          Metrics
-                        </p>
+                          textTransform:"uppercase", letterSpacing:".06em", marginBottom:10 }}>Metrics</p>
                         <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8 }}>
                           {[
                             ["Hand visibility", `${da.metrics?.hand_visibility_pct??'—'}%`],
@@ -530,14 +484,10 @@ function HistoryView({ onBack }) {
                           ))}
                         </div>
                       </div>
-
-                      {/* Rule-based coaching in history */}
                       {da.strengths?.length>0 && (
                         <div style={{ padding:"0 20px 16px" }}>
                           <p style={{ fontSize:10, color:"rgba(255,255,255,0.3)",
-                            textTransform:"uppercase", letterSpacing:".06em", marginBottom:8 }}>
-                            Strengths
-                          </p>
+                            textTransform:"uppercase", letterSpacing:".06em", marginBottom:8 }}>Strengths</p>
                           {da.strengths.map((s,i)=>(
                             <div key={i} style={{ display:"flex", gap:8, alignItems:"flex-start", marginBottom:5 }}>
                               <span style={{ color:"#30d158", flexShrink:0 }}>✓</span>
@@ -549,9 +499,7 @@ function HistoryView({ onBack }) {
                       {da.coaching?.length>0 && (
                         <div style={{ padding:"0 20px 16px" }}>
                           <p style={{ fontSize:10, color:"rgba(255,255,255,0.3)",
-                            textTransform:"uppercase", letterSpacing:".06em", marginBottom:8 }}>
-                            Coaching
-                          </p>
+                            textTransform:"uppercase", letterSpacing:".06em", marginBottom:8 }}>Coaching</p>
                           {da.coaching.map((c,i)=>(
                             <div key={i} style={{ display:"flex", gap:8, alignItems:"flex-start", marginBottom:5 }}>
                               <span style={{ color:"#0a84ff", fontWeight:700, fontSize:12, flexShrink:0 }}>→</span>
@@ -560,8 +508,6 @@ function HistoryView({ onBack }) {
                           ))}
                         </div>
                       )}
-
-                      {/* ✅ Groq AI section in history */}
                       {groq && (
                         <div style={{ margin:"0 20px 20px",
                           background:"rgba(10,132,255,0.05)",
@@ -607,6 +553,18 @@ export default function SpeakWell() {
   const [saving,      setSaving]      = useState(false);
   const [showName,    setShowName]    = useState(false);
   const [processing,  setProcessing]  = useState(false);
+  const [userId,      setUserId]      = useState(null); // ← current user ID
+
+  // ── Get current logged-in user ──────────────────────────────────
+  useEffect(()=>{
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) setUserId(data.user.id);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id || null);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
   useEffect(()=>{
     navigator.mediaDevices
@@ -683,16 +641,19 @@ export default function SpeakWell() {
     setSaving(true);
 
     try{
-      // Step 1: Deep analysis + Groq on HF Space
       const deepRes  = await fetch(`${ML_URL}/analyze_deep`,{
         method:"POST", headers:{"Content-Type":"application/json"},
         body:JSON.stringify({ timeline }),
       });
       const deepData = await deepRes.json();
 
-      // Step 2: Save to Supabase (groq_analysis is inside deep_analysis)
+      // ← send user_id in header so backend saves per user
       await fetch(`${BACKEND_URL}/api/speakwell/sessions`,{
-        method:"POST", headers:{"Content-Type":"application/json"},
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "x-user-id": userId || "guest",
+        },
         body:JSON.stringify({
           name:             sessName || `Session ${new Date().toLocaleString()}`,
           created_at:       new Date().toISOString(),
@@ -706,7 +667,7 @@ export default function SpeakWell() {
           rating:           deepData.rating,
           tips:             deepData.tips || [],
           score_timeline:   deepData.score_timeline || [],
-          deep_analysis:    deepData,   // full result including groq_analysis
+          deep_analysis:    deepData,
         }),
       });
 
@@ -724,7 +685,7 @@ export default function SpeakWell() {
   const scoreCol=score>=75?"#30d158":score>=50?"#ffd60a":score>0?"#ff453a":"rgba(255,255,255,0.2)";
   const statusLabel=analysis?.color==="green"?"Good gesture":analysis?.color==="yellow"?"Needs attention":analysis?.color==="red"?"Incorrect":"Ready";
 
-  if(view==="history") return <HistoryView onBack={()=>setView("practice")}/>;
+  if(view==="history") return <HistoryView onBack={()=>setView("practice")} userId={userId}/>;
 
   return (
     <div style={{ position:"relative", width:"100%", height:"100vh",
@@ -759,15 +720,12 @@ export default function SpeakWell() {
       <video ref={videoRef} muted playsInline style={{
         position:"absolute", inset:0, width:"100%", height:"100%",
         objectFit:"cover", transform:"scaleX(-1)" }}/>
-
       <canvas ref={canvasRef} style={{
         position:"absolute", inset:0, width:"100%", height:"100%",
         transform:"scaleX(-1)", pointerEvents:"none" }}/>
-
       <div style={{ position:"absolute", inset:0, pointerEvents:"none",
         background:"radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,0.6) 100%)" }}/>
 
-      {/* Top bar */}
       <div style={{ position:"absolute", top:0, left:0, right:0, padding:"16px 20px",
         display:"flex", alignItems:"center", justifyContent:"space-between",
         background:"linear-gradient(to bottom,rgba(0,0,0,0.65) 0%,transparent 100%)" }}>
@@ -827,11 +785,9 @@ export default function SpeakWell() {
         </div>
       )}
 
-      {/* Bottom */}
       <div style={{ position:"absolute", bottom:0, left:0, right:0,
         padding:"0 20px 36px",
         background:"linear-gradient(to top,rgba(0,0,0,0.85) 0%,transparent 100%)" }}>
-
         {recording && analysis && (
           <div style={{ display:"flex", flexWrap:"wrap", gap:7,
             justifyContent:"center", marginBottom:16 }}>
@@ -849,7 +805,6 @@ export default function SpeakWell() {
             ))}
           </div>
         )}
-
         {recording && (
           <div style={{ textAlign:"center", marginBottom:20,
             fontFamily:"monospace", fontSize:36, fontWeight:700,
@@ -861,7 +816,6 @@ export default function SpeakWell() {
             {fmt(elapsed)}
           </div>
         )}
-
         {!recording && showName && (
           <div style={{ maxWidth:320, margin:"0 auto 14px" }}>
             <input value={sessName} onChange={e=>setSessName(e.target.value)}
@@ -873,7 +827,6 @@ export default function SpeakWell() {
                 outline:"none", fontFamily:"inherit", textAlign:"center" }}/>
           </div>
         )}
-
         <div style={{ display:"flex", justifyContent:"center", gap:12 }}>
           {!recording ? (
             <>
@@ -907,7 +860,6 @@ export default function SpeakWell() {
             </button>
           )}
         </div>
-
         {!recording && (
           <p style={{ textAlign:"center", marginTop:14,
             fontSize:12, color:"rgba(255,255,255,0.3)", letterSpacing:".01em" }}>
