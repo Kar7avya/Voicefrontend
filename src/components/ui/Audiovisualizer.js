@@ -279,7 +279,6 @@ export default function AudioVisualizer({
 
     if (!audioFeatures && !audioURL) return null;
 
-    const aDur   = durRef.current || duration || 1;
     const nowWord = words.find(w => currentTime >= w.t && currentTime < w.t + w.dur);
     const nowVol  = nowWord ? getVolLevel(nowWord.amp) : null;
 
