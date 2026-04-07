@@ -259,11 +259,12 @@ const SmartTTS = () => {
 
             setAudioURL(`${API}${data.audio_url}`);
 
-            if (data.translated) {
+            if (data.translated || data.input_lang_detected) {
                 setTranslationInfo({
                     original:   data.original_text,
                     translated: data.translated_text,
                     language:   data.language,
+                    inputLang:  data.input_lang_detected?.language || null,
                 });
             }
 
@@ -464,7 +465,7 @@ const SmartTTS = () => {
                                     <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                                         className="p-4 rounded-2xl bg-[#7C3AED]/10 border border-[#7C3AED]/30">
                                         <p className="text-[10px] uppercase tracking-widest text-[#a78bfa] font-bold mb-2">
-                                            🌐 Translated to {translationInfo.language}
+                                            🌐 {translationInfo.inputLang ? translationInfo.inputLang + " → " : ""}{translationInfo.language.charAt(0).toUpperCase() + translationInfo.language.slice(1)}
                                         </p>
                                         <p className="text-xs line-through mb-1" style={{ color: "#9ca3af" }}>{translationInfo.original}</p>
                                         <p className="text-sm font-medium" style={{ color: "#111827" }}>{translationInfo.translated}</p>
