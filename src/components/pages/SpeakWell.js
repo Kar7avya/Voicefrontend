@@ -1,13 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
+import supabase from "./supabaseClient";
 
 const ML_URL      = process.env.REACT_APP_ML_URL      || "";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
 
-const supabase = createClient(
-  process.env.REACT_APP_SUPABASE_URL,
-  process.env.REACT_APP_SUPABASE_ANON_KEY
-);
+
 
 const HAND_CONN = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
 const POSE_CONN = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
