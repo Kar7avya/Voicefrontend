@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
-import { Mic, Play, Pause, Download, X, Check, Volume2, History, RefreshCw, Brain, Shield, AlertTriangle } from "lucide-react";
+import { Mic, Play, Pause, Download, X, Check, Volume2, History, RefreshCw } from "lucide-react";
 import { EmotionPanel } from "../ui/emotion-detection-panel";
 import AudioVisualizer from "../ui/Audiovisualizer";
 
