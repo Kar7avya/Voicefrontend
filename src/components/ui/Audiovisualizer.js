@@ -190,7 +190,7 @@ export default function AudioVisualizer({
                 const lv    = getVolLevel(w.amp);
                 const relSt = w.t / aDur;
                 const relEn = (w.t + w.dur) / aDur;
-                ctx.fillStyle = lv.bg + "99";
+                ctx.fillStyle = lv.bg + "dd";
                 ctx.fillRect(relSt * W, 0, Math.max(2, (relEn - relSt) * W), H);
             });
 
@@ -241,16 +241,7 @@ export default function AudioVisualizer({
                 }
                 ctx.stroke();
 
-                // Word volume labels on waveform
-                words.forEach(w => {
-                    const lv     = getVolLevel(w.amp);
-                    const relMid = (w.t + w.dur/2) / aDur;
-                    const wx     = relMid * W;
-                    ctx.fillStyle   = lv.color + "cc";
-                    ctx.font        = "bold 9px sans-serif";
-                    ctx.textAlign   = "center";
-                    ctx.fillText(lv.short, wx, H - 4);
-                });
+
 
                 // Playhead
                 const px = W / 2;
@@ -406,15 +397,38 @@ export default function AudioVisualizer({
             {/* ── WAVEFORM TAB ── */}
             {tab === "wave" && (
                 <div style={{ padding:"12px 18px" }}>
-                    <p style={{ fontSize:9, fontWeight:700, color:"#7c3aed", textTransform:"uppercase", letterSpacing:"0.1em", margin:"0 0 8px" }}>
-                        Tall wave = loud · Flat = soft · Each color = one word
-                    </p>
+                    {/* How to read */}
+                    <div style={{ display:"flex", gap:14, marginBottom:10, flexWrap:"wrap" }}>
+                        <span style={{ fontSize:10, color:"#7c3aed", fontWeight:600 }}>📈 Tall wave = LOUD</span>
+                        <span style={{ fontSize:10, color:"#7c3aed", fontWeight:600 }}>➖ Flat line = SOFT / pause</span>
+                        <span style={{ fontSize:10, color:"#ef4444", fontWeight:600 }}>▼ Red line = now</span>
+                    </div>
                     <canvas ref={waveRef} width={560} height={130}
                         style={{ width:"100%", height:130, display:"block", borderRadius:8 }} />
-                    <div style={{ display:"flex", justifyContent:"space-between", margin:"5px 0 10px" }}>
-                        <span style={{ fontSize:10, color:"#a78bfa" }}>← Earlier</span>
-                        <span style={{ fontSize:10, color:"#ef4444", fontWeight:700 }}>▼ Now</span>
-                        <span style={{ fontSize:10, color:"#a78bfa" }}>Later →</span>
+                    {/* Color legend — one row per word */}
+                    <div style={{ display:"flex", gap:4, marginTop:8, flexWrap:"wrap" }}>
+                        {words.map((w, i) => {
+                            const lv = getVolLevel(w.amp);
+                            const isActive = currentTime >= w.t && currentTime < w.t + w.dur;
+                            return (
+                                <div key={i} style={{
+                                    display:"flex", alignItems:"center", gap:4,
+                                    padding:"3px 8px", borderRadius:999,
+                                    backgroundColor: lv.bg,
+                                    border: `1.5px solid ${isActive ? lv.color : lv.border}`,
+                                    fontSize:9, fontWeight:700, color: lv.color,
+                                    transform: isActive ? "scale(1.1)" : "scale(1)",
+                                    transition:"all 0.2s",
+                                }}>
+                                    <span style={{ width:6, height:6, borderRadius:"50%", backgroundColor: lv.color, display:"inline-block", flexShrink:0 }} />
+                                    {lv.short}
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div style={{ display:"flex", justifyContent:"space-between", margin:"6px 0 4px" }}>
+                        <span style={{ fontSize:10, color:"#a78bfa" }}>← Earlier in speech</span>
+                        <span style={{ fontSize:10, color:"#a78bfa" }}>Later in speech →</span>
                     </div>
                 </div>
             )}
