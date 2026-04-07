@@ -1,66 +1,58 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// ── Volume level classifier ───────────────────────────────────────────────────
 function getVolLevel(amp) {
     if (amp >= 0.65) return {
         label: "🔊 LOUD",   short: "LOUD",
         color: "#d97706",   bg: "#fef3c7", border: "#fcd34d",
-        tip:   "Speak with FULL voice here",
+        tip:   "Speak with full voice",
         pct:   Math.min(100, Math.round(amp * 100)),
     };
     if (amp >= 0.30) return {
         label: "🔉 MEDIUM", short: "MEDIUM",
         color: "#1d4ed8",   bg: "#dbeafe", border: "#93c5fd",
-        tip:   "Use NORMAL speaking voice here",
+        tip:   "Normal speaking voice",
         pct:   Math.min(100, Math.round(amp * 100)),
     };
     return {
         label: "🔈 SOFT",   short: "SOFT",
         color: "#4b5563",   bg: "#f3f4f6", border: "#d1d5db",
-        tip:   "LOWER your voice here",
+        tip:   "Lower your voice",
         pct:   Math.min(100, Math.round(amp * 100)),
     };
 }
 
-// ── Detect speech segments from silence ───────────────────────────────────────
 function detectSegments(pcm, sr) {
     const frameMs   = 20;
     const frameSize = Math.floor(sr * frameMs / 1000);
     const silThresh = 0.006;
     const minWordF  = Math.floor(80  / frameMs);
     const minSilF   = Math.floor(60  / frameMs);
-
     const rms = [];
     for (let i = 0; i + frameSize < pcm.length; i += frameSize) {
         let s = 0;
         for (let j = 0; j < frameSize; j++) s += pcm[i+j]*pcm[i+j];
-        rms.push(Math.sqrt(s/frameSize));
+        rms.push(Math.sqrt(s / frameSize));
     }
-
     const voiced = rms.map(r => r > silThresh);
     const segs   = [];
     let inWord = false, wordStart = 0, silCount = 0;
-
     for (let i = 0; i < voiced.length; i++) {
-        if (!inWord && voiced[i]) {
-            inWord = true; wordStart = i; silCount = 0;
-        } else if (inWord) {
+        if (!inWord && voiced[i]) { inWord = true; wordStart = i; silCount = 0; }
+        else if (inWord) {
             if (!voiced[i]) {
                 silCount++;
                 if (silCount >= minSilF) {
                     const wordEnd = i - silCount;
-                    if (wordEnd - wordStart >= minWordF) {
+                    if (wordEnd - wordStart >= minWordF)
                         segs.push({ t: wordStart * frameMs/1000, dur: (wordEnd - wordStart) * frameMs/1000 });
-                    }
                     inWord = false; silCount = 0;
                 }
-            } else { silCount = 0; }
+            } else silCount = 0;
         }
     }
-    if (inWord && voiced.length - wordStart >= minWordF) {
+    if (inWord && voiced.length - wordStart >= minWordF)
         segs.push({ t: wordStart * frameMs/1000, dur: (voiced.length - wordStart) * frameMs/1000 });
-    }
     return segs;
 }
 
@@ -72,8 +64,6 @@ function segRMS(pcm, sr, t, dur) {
     return cnt > 0 ? Math.sqrt(sum/cnt) : 0;
 }
 
-const WIN_SEC = 1.4;
-
 export default function AudioVisualizer({
     audioURL, audioFeatures, isPlaying, currentTime, duration, language, translatedText
 }) {
@@ -84,9 +74,8 @@ export default function AudioVisualizer({
     const durRef    = useRef(0);
 
     const [status, setStatus] = useState("idle");
-    const [segs,   setSegs]   = useState([]);   // detected speech segments
+    const [segs,   setSegs]   = useState([]);
 
-    // ── Decode audio + detect segments ───────────────────────────────────────
     useEffect(() => {
         if (!audioURL) return;
         pcmRef.current = null;
@@ -108,20 +97,15 @@ export default function AudioVisualizer({
                 pcmRef.current = pcm;
                 durRef.current = decoded.duration;
 
-                // Detect speech segments
-                const raw    = detectSegments(pcm, sr);
+                const raw     = detectSegments(pcm, sr);
                 const withRms = raw.map(s => ({ ...s, rms: segRMS(pcm, sr, s.t, s.dur) }));
                 const maxRms  = Math.max(...withRms.map(s => s.rms), 0.001);
-
-                // Assign word labels from translatedText
                 const tWords  = translatedText ? translatedText.trim().split(/\s+/) : [];
-                const normed  = withRms.map((s, i) => ({
+                setSegs(withRms.map((s, i) => ({
                     ...s,
-                    amp:   s.rms / maxRms,
-                    word:  tWords[i] ? tWords[i] : `Part ${i+1}`,
-                }));
-
-                setSegs(normed);
+                    amp:  s.rms / maxRms,
+                    word: tWords[i] || `Part ${i+1}`,
+                })));
                 setStatus("ready");
             } catch (e) {
                 console.warn("AudioVisualizer:", e.message);
@@ -130,7 +114,7 @@ export default function AudioVisualizer({
         })();
     }, [audioURL, translatedText]);
 
-    // ── Canvas draw — waveform with colored bands ─────────────────────────────
+    // ── Draw clean single-line waveform ───────────────────────────────────────
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -142,98 +126,111 @@ export default function AudioVisualizer({
             const mid  = H / 2;
             const aDur = durRef.current || duration || 1;
             ctx.clearRect(0, 0, W, H);
-            ctx.fillStyle = "#faf5ff";
+
+            // White background
+            ctx.fillStyle = "#ffffff";
             ctx.fillRect(0, 0, W, H);
 
             const pcm = pcmRef.current;
             const sr  = srRef.current;
 
-            // ── Colored band per segment ──────────────────────────────────────
-            if (aDur > 0) {
+            if (pcm && status === "ready" && aDur > 0) {
+                // Show full waveform (not sliding window — full sentence overview)
+                const total = pcm.length;
+
+                // Downsample PCM to W points
+                const step = total / W;
+                let mx = 0.001;
+                for (let i = 0; i < total; i += Math.floor(step))
+                    if (Math.abs(pcm[i]) > mx) mx = Math.abs(pcm[i]);
+
+                // Color each segment differently based on volume
+                // First draw colored fills
                 segs.forEach(w => {
                     const lv    = getVolLevel(w.amp);
-                    const relSt = Math.max(0, w.t / aDur);
-                    const relEn = Math.min(1, (w.t + w.dur) / aDur);
-                    ctx.fillStyle = lv.bg + "ee";
-                    ctx.fillRect(relSt * W, 0, Math.max(2, (relEn - relSt) * W), H);
+                    const x0    = Math.floor((w.t / aDur) * W);
+                    const x1    = Math.floor(((w.t + w.dur) / aDur) * W);
+                    const segW  = Math.max(2, x1 - x0);
 
-                    // Volume label at bottom of each band — spaced to avoid overlap
-                    const bw = (relEn - relSt) * W;
-                    if (bw > 30) {
-                        const bx = relSt * W + bw / 2;
-                        ctx.fillStyle   = lv.color;
-                        ctx.font        = `bold ${bw > 60 ? 9 : 8}px sans-serif`;
-                        ctx.textAlign   = "center";
-                        ctx.fillText(lv.short, bx, H - 5);
+                    // Draw segment wave fill with color
+                    ctx.fillStyle = lv.bg + "bb";
+                    ctx.beginPath();
+                    ctx.moveTo(x0, mid);
+                    for (let x = x0; x < x1; x++) {
+                        const si = Math.floor((x / W) * total);
+                        const v  = pcm[Math.min(si, total-1)] / mx;
+                        ctx.lineTo(x, mid - v * (mid - 8));
                     }
+                    ctx.lineTo(x1, mid);
+                    ctx.closePath();
+                    ctx.fill();
                 });
-            }
 
-            // ── Center dashed line ────────────────────────────────────────────
-            ctx.strokeStyle = "rgba(124,58,237,0.2)";
-            ctx.lineWidth   = 1; ctx.setLineDash([4, 4]);
-            ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke();
-            ctx.setLineDash([]);
+                // Draw the clean single waveform line on top
+                // Color changes per segment
+                let prevX = 0;
+                segs.forEach((w, wi) => {
+                    const lv = getVolLevel(w.amp);
+                    const x0 = Math.floor((w.t / aDur) * W);
+                    const x1 = Math.floor(((w.t + w.dur) / aDur) * W);
 
-            if (pcm && status === "ready" && aDur > 0) {
-                const half   = WIN_SEC / 2;
-                const startT = Math.max(0, currentTime - half);
-                const endT   = Math.min(aDur, currentTime + half);
-                const s0     = Math.floor(startT * sr);
-                const sN     = Math.floor(endT * sr);
-                const range  = Math.max(1, sN - s0);
-                const total  = pcm.length;
+                    // Draw silence gap before word (flat line)
+                    const prevEnd = wi === 0 ? 0 : Math.floor(((segs[wi-1].t + segs[wi-1].dur) / aDur) * W);
+                    if (x0 > prevEnd) {
+                        ctx.strokeStyle = "#d1d5db";
+                        ctx.lineWidth   = 1.5;
+                        ctx.beginPath();
+                        ctx.moveTo(prevEnd, mid);
+                        ctx.lineTo(x0, mid);
+                        ctx.stroke();
+                    }
 
-                let mx = 0.01;
-                for (let i = s0; i < sN; i += 4)
-                    if (Math.abs(pcm[Math.min(i, total-1)]) > mx)
-                        mx = Math.abs(pcm[Math.min(i, total-1)]);
+                    // Draw voiced segment with volume color
+                    ctx.strokeStyle = lv.color;
+                    ctx.lineWidth   = 2;
+                    ctx.lineJoin    = "round";
+                    ctx.lineCap     = "round";
+                    ctx.beginPath();
+                    for (let x = x0; x <= x1; x++) {
+                        const si = Math.floor((x / W) * total);
+                        const v  = pcm[Math.min(si, total-1)] / mx;
+                        const y  = mid - v * (mid - 8);
+                        x === x0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                    prevX = x1;
+                });
 
-                // Purple fill above
-                ctx.fillStyle = "rgba(109,40,217,0.2)";
-                ctx.beginPath(); ctx.moveTo(0, mid);
-                for (let x = 0; x < W; x++) {
-                    const v = pcm[Math.min(s0 + Math.floor((x/W)*range), total-1)] / mx;
-                    ctx.lineTo(x, mid - Math.max(0, v) * (mid - 18));
+                // Trailing silence
+                if (prevX < W) {
+                    ctx.strokeStyle = "#d1d5db";
+                    ctx.lineWidth   = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(prevX, mid);
+                    ctx.lineTo(W, mid);
+                    ctx.stroke();
                 }
-                ctx.lineTo(W, mid); ctx.closePath(); ctx.fill();
 
-                // Pink fill below
-                ctx.fillStyle = "rgba(236,72,153,0.12)";
-                ctx.beginPath(); ctx.moveTo(0, mid);
-                for (let x = 0; x < W; x++) {
-                    const v = pcm[Math.min(s0 + Math.floor((x/W)*range), total-1)] / mx;
-                    ctx.lineTo(x, mid - Math.min(0, v) * (mid - 18));
-                }
-                ctx.lineTo(W, mid); ctx.closePath(); ctx.fill();
+                // Playhead — thin vertical red line
+                const px = Math.floor((currentTime / aDur) * W);
+                ctx.strokeStyle = "#ef4444";
+                ctx.lineWidth   = 1.5;
+                ctx.beginPath(); ctx.moveTo(px, 4); ctx.lineTo(px, H-4); ctx.stroke();
 
-                // Wave line
-                ctx.strokeStyle = "#7c3aed"; ctx.lineWidth = 2;
-                ctx.beginPath();
-                for (let x = 0; x < W; x++) {
-                    const v = pcm[Math.min(s0 + Math.floor((x/W)*range), total-1)] / mx;
-                    const y = mid - v * (mid - 18);
-                    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-                }
-                ctx.stroke();
-
-                // Playhead
-                const px = W / 2;
-                ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 2.5;
-                ctx.beginPath(); ctx.moveTo(px, 2); ctx.lineTo(px, H-2); ctx.stroke();
+                // Dot on wave at playhead
                 const cv = pcm[Math.min(Math.floor(currentTime * sr), total-1)] / mx;
-                const cy = mid - cv * (mid - 18);
+                const cy = mid - cv * (mid - 8);
                 ctx.fillStyle = "#ef4444";
-                ctx.beginPath(); ctx.arc(px, cy, 5, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(px, cy, 4, 0, Math.PI*2); ctx.fill();
                 ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5;
-                ctx.beginPath(); ctx.arc(px, cy, 5, 0, Math.PI*2); ctx.stroke();
-            }
+                ctx.beginPath(); ctx.arc(px, cy, 4, 0, Math.PI*2); ctx.stroke();
 
-            // Axis labels
-            ctx.font = "bold 9px sans-serif"; ctx.textAlign = "left";
-            ctx.fillStyle = "rgba(109,40,217,0.6)";
-            ctx.fillText("LOUD ↑", 4, 14);
-            ctx.fillText("SOFT ↓", 4, H - 18);
+            } else {
+                // No audio yet — draw flat center line
+                ctx.strokeStyle = "#e5e7eb";
+                ctx.lineWidth   = 1.5;
+                ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke();
+            }
 
             animRef.current = requestAnimationFrame(draw);
         };
@@ -253,80 +250,75 @@ export default function AudioVisualizer({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
-            style={{ borderRadius: 16, border: "1.5px solid #e0d7f5", overflow: "hidden", backgroundColor: "#f8f5ff" }}
+            style={{ borderRadius: 16, border: "1.5px solid #e5e7eb", overflow: "hidden", backgroundColor: "#ffffff" }}
         >
             {/* Header */}
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 18px", borderBottom:"1px solid #e0d7f5", backgroundColor:"#ede9fe" }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 18px", borderBottom:"1px solid #f3f4f6", backgroundColor:"#fafafa" }}>
                 <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                    <div style={{ width:28, height:28, borderRadius:8, backgroundColor:"#ddd6fe", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>🎙️</div>
+                    <div style={{ width:28, height:28, borderRadius:8, backgroundColor:"#f3f4f6", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>🎙️</div>
                     <div>
-                        <p style={{ fontSize:11, fontWeight:700, color:"#3730a3", margin:0 }}>Speaking Volume Guide</p>
-                        <p style={{ fontSize:9, color:"#7c3aed", margin:"2px 0 0" }}>
-                            {status === "loading" ? "⏳ Analysing audio..."
-                             : status === "ready"  ? `How loud to speak · ${segs.length} parts detected · ${language || ""}`
+                        <p style={{ fontSize:11, fontWeight:700, color:"#111827", margin:0 }}>Speaking Volume Guide</p>
+                        <p style={{ fontSize:9, color:"#6b7280", margin:"2px 0 0" }}>
+                            {status === "loading" ? "⏳ Analysing..."
+                             : status === "ready"  ? `${segs.length} parts · how loud to speak each word · ${language || ""}`
                              :                       language || ""}
                         </p>
                     </div>
                 </div>
-                {/* Live indicator */}
-                <div style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:999, backgroundColor: isPlaying ? "#dcfce7" : "#ede9fe", border:`1px solid ${isPlaying ? "#86efac" : "#c4b5fd"}`, fontSize:9, fontWeight:700, color: isPlaying ? "#15803d" : "#7c3aed" }}>
-                    <span style={{ width:6, height:6, borderRadius:"50%", backgroundColor: isPlaying ? "#16a34a" : "#7c3aed", display:"inline-block" }} />
-                    {isPlaying ? "Playing" : "Ready"}
+                <div style={{ display:"flex", gap:6 }}>
+                    {[
+                        { bg:"#fef3c7", color:"#d97706", label:"🔊 LOUD" },
+                        { bg:"#dbeafe", color:"#1d4ed8", label:"🔉 MED"  },
+                        { bg:"#f3f4f6", color:"#4b5563", label:"🔈 SOFT" },
+                    ].map((l, i) => (
+                        <span key={i} style={{ padding:"3px 8px", borderRadius:999, fontSize:9, fontWeight:700, backgroundColor:l.bg, color:l.color }}>
+                            {l.label}
+                        </span>
+                    ))}
                 </div>
             </div>
 
-            {/* ── NOW PLAYING BANNER ── */}
+            {/* ── NOW PLAYING ── */}
             <AnimatePresence mode="wait">
                 {nowVol && nowSeg && (
                     <motion.div
                         key={nowSeg.t}
-                        initial={{ opacity: 0, y: -8 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        style={{ margin:"12px 18px 0", padding:"12px 16px", borderRadius:12, backgroundColor: nowVol.bg, border:`2px solid ${nowVol.border}` }}
+                        transition={{ duration: 0.15 }}
+                        style={{ margin:"10px 18px 0", padding:"10px 14px", borderRadius:10, backgroundColor: nowVol.bg, border:`1.5px solid ${nowVol.border}`, display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}
                     >
-                        <p style={{ fontSize:9, fontWeight:700, color: nowVol.color, textTransform:"uppercase", margin:"0 0 4px" }}>Right now — speak like this:</p>
-                        <div style={{ display:"flex", alignItems:"center", gap:14, flexWrap:"wrap" }}>
-                            <p style={{ fontSize:26, fontWeight:900, color: nowVol.color, margin:0 }}>{nowVol.label}</p>
-                            <p style={{ fontSize:12, color:"#374151", margin:0, fontWeight:600 }}>{nowVol.tip}</p>
-                            <div style={{ flex:1, minWidth:80, height:10, background:"#e5e7eb", borderRadius:999, overflow:"hidden" }}>
-                                <motion.div
-                                    style={{ height:"100%", borderRadius:999, backgroundColor: nowVol.color }}
-                                    animate={{ width: nowVol.pct + "%" }}
-                                    transition={{ duration: 0.15 }}
-                                />
-                            </div>
-                            <span style={{ fontSize:14, fontWeight:800, color: nowVol.color }}>{nowVol.pct}%</span>
+                        <p style={{ fontSize:9, fontWeight:700, color: nowVol.color, textTransform:"uppercase", margin:0, minWidth:60 }}>Now →</p>
+                        <p style={{ fontSize:20, fontWeight:900, color: nowVol.color, margin:0 }}>{nowVol.label}</p>
+                        <p style={{ fontSize:11, fontWeight:600, color:"#374151", margin:0 }}>{nowVol.tip}</p>
+                        <div style={{ flex:1, minWidth:60, height:6, background:"#e5e7eb", borderRadius:999, overflow:"hidden" }}>
+                            <div style={{ height:"100%", width: nowVol.pct+"%", background: nowVol.color, borderRadius:999 }} />
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* ── WAVEFORM with colored bands ── */}
-            <div style={{ padding:"12px 18px 4px" }}>
-                <div style={{ display:"flex", gap:14, marginBottom:8, flexWrap:"wrap" }}>
-                    <span style={{ fontSize:10, fontWeight:600, color:"#7c3aed" }}>📈 Tall wave = loud part</span>
-                    <span style={{ fontSize:10, fontWeight:600, color:"#7c3aed" }}>➖ Flat = soft / pause</span>
-                    <span style={{ fontSize:10, fontWeight:600, color:"#ef4444" }}>▼ Red = now</span>
-                </div>
+            {/* ── WAVEFORM ── */}
+            <div style={{ padding:"12px 18px 6px" }}>
                 <canvas
                     ref={canvasRef}
                     width={560}
-                    height={120}
-                    style={{ width:"100%", height:120, display:"block", borderRadius:8 }}
+                    height={100}
+                    style={{ width:"100%", height:100, display:"block", borderRadius:6, border:"1px solid #f3f4f6" }}
                 />
-                <div style={{ display:"flex", justifyContent:"space-between", margin:"4px 0 6px" }}>
-                    <span style={{ fontSize:10, color:"#a78bfa" }}>← Earlier in sentence</span>
-                    <span style={{ fontSize:10, color:"#a78bfa" }}>Later in sentence →</span>
+                <div style={{ display:"flex", justifyContent:"space-between", marginTop:4 }}>
+                    <span style={{ fontSize:9, color:"#9ca3af" }}>Start of sentence</span>
+                    <span style={{ fontSize:9, color:"#ef4444", fontWeight:600 }}>▲ red dot = now</span>
+                    <span style={{ fontSize:9, color:"#9ca3af" }}>End of sentence</span>
                 </div>
             </div>
 
-            {/* ── WORD CARDS — full sentence breakdown ── */}
+            {/* ── WORD CARDS ── */}
             {status === "ready" && segs.length > 0 && (
-                <div style={{ padding:"0 18px 14px" }}>
-                    <p style={{ fontSize:10, fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.08em", margin:"4px 0 8px" }}>
-                        Full sentence — word by word volume guide
+                <div style={{ padding:"6px 18px 14px" }}>
+                    <p style={{ fontSize:9, fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.08em", margin:"0 0 8px" }}>
+                        Word by word guide
                     </p>
                     <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:4 }}>
                         {segs.map((w, i) => {
@@ -334,24 +326,23 @@ export default function AudioVisualizer({
                             const isActive = currentTime >= w.t && currentTime < w.t + w.dur;
                             return (
                                 <div key={i} style={{
-                                    borderRadius:10, padding:"10px 12px",
+                                    borderRadius:10, padding:"8px 12px",
                                     backgroundColor: lv.bg,
                                     border:`${isActive ? 2.5 : 1.5}px solid ${isActive ? lv.color : lv.border}`,
-                                    minWidth:80, flexShrink:0,
+                                    minWidth:75, flexShrink:0,
                                     transform: isActive ? "scale(1.08)" : "scale(1)",
                                     transition:"all 0.2s",
-                                    boxShadow: isActive ? `0 4px 16px ${lv.color}44` : "none",
+                                    boxShadow: isActive ? `0 4px 12px ${lv.color}44` : "none",
                                 }}>
-                                    <p style={{ fontSize:13, fontWeight:700, color:"#1f2937", margin:"0 0 3px", whiteSpace:"nowrap" }}>
+                                    <p style={{ fontSize:12, fontWeight:700, color:"#111827", margin:"0 0 3px", whiteSpace:"nowrap" }}>
                                         {w.word}
                                     </p>
-                                    <p style={{ fontSize:11, fontWeight:800, color:lv.color, margin:"0 0 5px" }}>
-                                        {lv.label}
+                                    <p style={{ fontSize:11, fontWeight:800, color:lv.color, margin:"0 0 4px" }}>
+                                        {lv.short}
                                     </p>
-                                    <div style={{ height:4, background:"#e5e7eb", borderRadius:999, overflow:"hidden", marginBottom:3 }}>
+                                    <div style={{ height:3, background:"#e5e7eb", borderRadius:999, overflow:"hidden" }}>
                                         <div style={{ height:"100%", width:lv.pct+"%", background:lv.color, borderRadius:999 }} />
                                     </div>
-                                    <p style={{ fontSize:9, color:"#6b7280", margin:0 }}>{lv.tip}</p>
                                 </div>
                             );
                         })}
@@ -360,23 +351,10 @@ export default function AudioVisualizer({
             )}
 
             {status === "loading" && (
-                <div style={{ padding:"20px", textAlign:"center", color:"#7c3aed", fontSize:12 }}>
-                    ⏳ Analysing audio to detect volume levels...
+                <div style={{ padding:"16px", textAlign:"center", color:"#9ca3af", fontSize:11 }}>
+                    ⏳ Analysing audio volume levels...
                 </div>
             )}
-
-            {/* Legend */}
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap", padding:"0 18px 10px" }}>
-                {[
-                    { bg:"#fef3c7", color:"#92400e", label:"🔊 LOUD — speak with full voice" },
-                    { bg:"#dbeafe", color:"#1e40af", label:"🔉 MEDIUM — normal voice" },
-                    { bg:"#f3f4f6", color:"#374151", label:"🔈 SOFT — lower your voice" },
-                ].map((l, i) => (
-                    <span key={i} style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:999, fontSize:10, fontWeight:600, backgroundColor:l.bg, color:l.color }}>
-                        {l.label}
-                    </span>
-                ))}
-            </div>
         </motion.div>
     );
 }
