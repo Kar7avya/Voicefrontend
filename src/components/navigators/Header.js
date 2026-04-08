@@ -43,7 +43,7 @@ const Header = () => {
           <li><NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/dashboard">Dashboard</NavLink></li>
           <li><NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/teleprompter">Teleprompter</NavLink></li>
           <li><NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/tts">TTS</NavLink></li>
-          <li><NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/speakwell">SpeakWell</NavLink></li>
+          {/* <li><NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/speakwell">SpeakWell</NavLink></li> */}
         </ul>
 
         {/* Actions */}
@@ -66,7 +66,7 @@ const Header = () => {
           <NavLink to="/dashboard" onClick={() => setMenuOpen(false)}>Dashboard</NavLink>
           <NavLink to="/teleprompter" onClick={() => setMenuOpen(false)}>Teleprompter</NavLink>
           <NavLink to="/tts" onClick={() => setMenuOpen(false)}>TTS</NavLink>
-          <NavLink to="/speakwell" onClick={() => setMenuOpen(false)}>SpeakWell</NavLink>
+          {/* <NavLink to="/speakwell" onClick={() => setMenuOpen(false)}>SpeakWell</NavLink> */}
           <button onClick={handleLogout}>Logout</button>
         </div>
       )}

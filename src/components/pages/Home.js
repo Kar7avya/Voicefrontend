@@ -975,7 +975,7 @@ export default function Home() {
                   {item.id}
                 </div>
 
-                {/* Info */}
+                {/* Info  */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                     <p className="text-[#1D1D1F] text-sm font-semibold">{item.title}</p>
