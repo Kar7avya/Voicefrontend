@@ -385,9 +385,9 @@ function getVolLevel(amp) {
 function detectSegments(pcm, sr) {
     const frameMs   = 20;
     const frameSize = Math.floor(sr * frameMs / 1000);
-    const silThresh = 0.006;
-    const minWordF  = Math.floor(80  / frameMs);
-    const minSilF   = Math.floor(60  / frameMs);
+    const silThresh = 0.003;
+    const minWordF  = Math.floor(50  / frameMs);
+    const minSilF   = Math.floor(40  / frameMs);
     const rms = [];
     for (let i = 0; i + frameSize < pcm.length; i += frameSize) {
         let s = 0;
@@ -570,7 +570,8 @@ export default function AudioVisualizer({
                             if (Math.abs(pcm[si]) > Math.abs(peakV)) peakV = pcm[si];
                         }
                         const peakY = mid - (peakV / mx) * (mid - 14);
-                        const bx    = Math.max(30, Math.min(W - 30, x0 + bw / 2));
+                        const bboxEst = 50;
+                        const bx    = Math.max(bboxEst/2 + 4, Math.min(W - bboxEst/2 - 4, x0 + bw / 2));
 
                         // Label position: above wave if positive, below if mostly negative
                         const labelY = peakV >= 0
@@ -578,7 +579,7 @@ export default function AudioVisualizer({
                             : Math.min(H - 8, peakY + 20);
 
                         // Bubble background
-                        const text    = w.word.length > 8 ? w.word.slice(0, 7) + "…" : w.word;
+                        const text    = w.word.length > 10 ? w.word.slice(0, 9) + "…" : w.word;
                         const volText = lv.short;
                         const bboxW   = Math.max(ctx.measureText(text).width, ctx.measureText(volText).width) + 12;
 
@@ -690,8 +691,8 @@ export default function AudioVisualizer({
                 <canvas
                     ref={canvasRef}
                     width={560}
-                    height={130}
-                    style={{ width:"100%", height:130, display:"block", borderRadius:8, border:"1px solid #f3f4f6" }}
+                    height={150}
+                    style={{ width:"100%", height:150, display:"block", borderRadius:8, border:"1px solid #f3f4f6" }}
                 />
                 <div style={{ display:"flex", justifyContent:"space-between", marginTop:4 }}>
                     <span style={{ fontSize:9, color:"#9ca3af" }}>← Start of sentence</span>
