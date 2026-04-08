@@ -382,38 +382,57 @@ function getVolLevel(amp) {
     };
 }
 
-function detectSegments(pcm, sr) {
+function detectSegments(pcm, sr, targetWords) {
     const frameMs   = 20;
     const frameSize = Math.floor(sr * frameMs / 1000);
-    const silThresh = 0.003;
-    const minWordF  = Math.floor(50  / frameMs);
-    const minSilF   = Math.floor(40  / frameMs);
+    const minWordF  = Math.floor(30 / frameMs);
+
     const rms = [];
     for (let i = 0; i + frameSize < pcm.length; i += frameSize) {
         let s = 0;
         for (let j = 0; j < frameSize; j++) s += pcm[i+j]*pcm[i+j];
         rms.push(Math.sqrt(s / frameSize));
     }
-    const voiced = rms.map(r => r > silThresh);
-    const segs   = [];
-    let inWord = false, wordStart = 0, silCount = 0;
-    for (let i = 0; i < voiced.length; i++) {
-        if (!inWord && voiced[i]) { inWord = true; wordStart = i; silCount = 0; }
-        else if (inWord) {
-            if (!voiced[i]) {
-                silCount++;
-                if (silCount >= minSilF) {
-                    const wordEnd = i - silCount;
-                    if (wordEnd - wordStart >= minWordF)
-                        segs.push({ t: wordStart * frameMs/1000, dur: (wordEnd - wordStart) * frameMs/1000 });
-                    inWord = false; silCount = 0;
+
+    // Try multiple thresholds — pick the one that gives closest to targetWords segments
+    const thresholds = [0.001, 0.002, 0.003, 0.005, 0.008, 0.012, 0.02];
+    const silGaps    = [2, 3, 4, 5];
+    let bestSegs = [];
+    let bestDiff = Infinity;
+
+    for (const silThresh of thresholds) {
+        for (const minSilF of silGaps) {
+            const voiced = rms.map(r => r > silThresh);
+            const segs   = [];
+            let inWord = false, wordStart = 0, silCount = 0;
+            for (let i = 0; i < voiced.length; i++) {
+                if (!inWord && voiced[i]) { inWord = true; wordStart = i; silCount = 0; }
+                else if (inWord) {
+                    if (!voiced[i]) {
+                        silCount++;
+                        if (silCount >= minSilF) {
+                            const wordEnd = i - silCount;
+                            if (wordEnd - wordStart >= minWordF)
+                                segs.push({ t: wordStart * frameMs/1000, dur: (wordEnd - wordStart) * frameMs/1000 });
+                            inWord = false; silCount = 0;
+                        }
+                    } else silCount = 0;
                 }
-            } else silCount = 0;
+            }
+            if (inWord && voiced.length - wordStart >= minWordF)
+                segs.push({ t: wordStart * frameMs/1000, dur: (voiced.length - wordStart) * frameMs/1000 });
+
+            const diff = Math.abs(segs.length - targetWords);
+            if (diff < bestDiff || (diff === bestDiff && segs.length > bestSegs.length)) {
+                bestDiff = diff;
+                bestSegs = segs;
+            }
+            if (diff === 0) break;
         }
+        if (bestDiff === 0) break;
     }
-    if (inWord && voiced.length - wordStart >= minWordF)
-        segs.push({ t: wordStart * frameMs/1000, dur: (voiced.length - wordStart) * frameMs/1000 });
-    return segs;
+
+    return bestSegs;
 }
 
 function segRMS(pcm, sr, t, dur) {
@@ -457,10 +476,10 @@ export default function AudioVisualizer({
                 pcmRef.current = pcm;
                 durRef.current = decoded.duration;
 
-                const raw     = detectSegments(pcm, sr);
+                const tWords  = translatedText ? translatedText.trim().split(/\s+/) : [];
+                const raw     = detectSegments(pcm, sr, tWords.length || 5);
                 const withRms = raw.map(s => ({ ...s, rms: segRMS(pcm, sr, s.t, s.dur) }));
                 const maxRms  = Math.max(...withRms.map(s => s.rms), 0.001);
-                const tWords  = translatedText ? translatedText.trim().split(/\s+/) : [];
                 setSegs(withRms.map((s, i) => ({
                     ...s,
                     amp:  s.rms / maxRms,
