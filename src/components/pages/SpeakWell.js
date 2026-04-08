@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import supabase from "./supabaseClient";
+import supabase from "../supabaseClient";
 
 const ML_URL      = process.env.REACT_APP_ML_URL      || "";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
