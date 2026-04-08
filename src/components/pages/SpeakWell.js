@@ -1,10 +1,22 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import supabase from "../pages/supabaseClient";
 
 const ML_URL      = process.env.REACT_APP_ML_URL      || "";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
 
-
+// ── Get userId directly from localStorage immediately (no async wait) ──
+function getUserIdFromStorage() {
+  try {
+    const keys = Object.keys(localStorage).filter(k => k.includes('supabase') || k.includes('sb-'));
+    for (const key of keys) {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.user?.id) return parsed.user.id;
+      }
+    }
+  } catch(e) {}
+  return null;
+}
 
 const HAND_CONN = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
 const POSE_CONN = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
@@ -65,7 +77,6 @@ function ScoreRing({ score, size=120 }) {
   );
 }
 
-// ── Groq AI Section ───────────────────────────────────────────────
 function GroqSection({ groq }) {
   if (!groq || !groq.groq_summary) return null;
   return (
@@ -148,7 +159,6 @@ function GroqSection({ groq }) {
   );
 }
 
-// ── Deep Result Modal ─────────────────────────────────────────────
 function DeepResultModal({ data, onClose, onHistory }) {
   if (!data) return null;
   const m = data.metrics || {};
@@ -295,7 +305,6 @@ function DeepResultModal({ data, onClose, onHistory }) {
   );
 }
 
-// ── History View ──────────────────────────────────────────────────
 function HistoryView({ onBack, userId }) {
   const [sessions,  setSessions]  = useState([]);
   const [stats,     setStats]     = useState(null);
@@ -303,7 +312,6 @@ function HistoryView({ onBack, userId }) {
   const [expanded,  setExpanded]  = useState(null);
 
   useEffect(()=>{
-    // ← wait until userId is actually ready before fetching
     if (!userId) return;
     setLoading(true);
     (async()=>{
@@ -323,7 +331,7 @@ function HistoryView({ onBack, userId }) {
       }
       setLoading(false);
     })();
-  },[userId]); // ← re-fetch whenever userId changes
+  },[userId]);
 
   const del = async id => {
     await fetch(`${BACKEND_URL}/api/speakwell/sessions/${id}`, {
@@ -335,7 +343,6 @@ function HistoryView({ onBack, userId }) {
 
   const rc={Excellent:"#30d158",Good:"#0a84ff","Needs Improvement":"#ffd60a",Poor:"#ff453a"};
 
-  // ← show spinner while waiting for userId
   if (!userId) return (
     <div style={{ minHeight:"100vh", background:"#000",
       display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -541,7 +548,6 @@ function HistoryView({ onBack, userId }) {
   );
 }
 
-// ── MAIN ─────────────────────────────────────────────────────────
 export default function SpeakWell() {
   const videoRef    = useRef(null);
   const canvasRef   = useRef(null);
@@ -565,20 +571,24 @@ export default function SpeakWell() {
   const [saving,      setSaving]      = useState(false);
   const [showName,    setShowName]    = useState(false);
   const [processing,  setProcessing]  = useState(false);
-  const [userId,      setUserId]      = useState(null);
-  const [authReady,   setAuthReady]   = useState(false); // ← new
+  // ✅ Initialize userId directly from localStorage — no async wait
+  const [userId, setUserId] = useState(() => getUserIdFromStorage());
 
-  // ── Get current logged-in user ────────────────────────────────
   useEffect(()=>{
-    supabase.auth.getUser().then(({ data }) => {
-      setUserId(data?.user?.id || null);
-      setAuthReady(true); // ← mark auth as resolved
-    });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id || null);
-      setAuthReady(true);
-    });
-    return () => listener.subscription.unsubscribe();
+    // Also try to update from supabase session in background
+    try {
+      const keys = Object.keys(localStorage).filter(k => k.includes('supabase') || k.includes('sb-'));
+      for (const key of keys) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.user?.id) {
+            setUserId(parsed.user.id);
+            break;
+          }
+        }
+      }
+    } catch(e) {}
   }, []);
 
   useEffect(()=>{
@@ -666,7 +676,7 @@ export default function SpeakWell() {
         method:"POST",
         headers:{
           "Content-Type":"application/json",
-          "x-user-id": userId || "guest",
+          "x-user-id": userId || getUserIdFromStorage() || "guest",
         },
         body:JSON.stringify({
           name:             sessName || `Session ${new Date().toLocaleString()}`,
@@ -699,11 +709,10 @@ export default function SpeakWell() {
   const scoreCol=score>=75?"#30d158":score>=50?"#ffd60a":score>0?"#ff453a":"rgba(255,255,255,0.2)";
   const statusLabel=analysis?.color==="green"?"Good gesture":analysis?.color==="yellow"?"Needs attention":analysis?.color==="red"?"Incorrect":"Ready";
 
-  // ← pass authReady so history knows when to start fetching
   if(view==="history") return (
     <HistoryView
       onBack={()=>setView("practice")}
-      userId={authReady ? userId : null}
+      userId={userId || getUserIdFromStorage()}
     />
   );
 
