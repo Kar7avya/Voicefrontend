@@ -1282,14 +1282,14 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
               const isProblem = problemLinesUI.some(p => p.text === line);
               if (enhancedData && viewMode === "practice") {
                 return (
-                  <div key={i} style={isProblem ? { color: "#ff6b6b" } : {}}>
+                  <div key={i} style={{ display: "flex", flexWrap: "wrap", ...(isProblem ? { color: "#ff6b6b" } : {}) }}>
                     {renderTaggedLine(line, i, currentLine, currentWord)}
                   </div>
                 );
               }
               const tokens = line.match(/\w+|[.,!?]/g) || [];
               return (
-                <div key={i} style={isProblem ? { color: "#ff6b6b" } : {}}>
+                <div key={i} style={{ display: "flex", flexWrap: "wrap", ...(isProblem ? { color: "#ff6b6b" } : {}) }}>
                   {tokens.map((t, idx) => (
                     <span
                       key={idx}

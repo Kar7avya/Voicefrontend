@@ -635,6 +635,10 @@ const css = `
     font-size: 15px;
     line-height: 1.9;
     letter-spacing: 0.1px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+    overflow: hidden;
   }
 
   .tp-word-active {
