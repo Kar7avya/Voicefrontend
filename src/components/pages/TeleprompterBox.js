@@ -1492,12 +1492,21 @@ function calculateSessionScore({ paceSummary, drift, problems, linesRead, totalL
 }
 
 function scoreLabel(score) {
-  if (score >= 95) return "Perfect";
-  if (score >= 85) return "Excellent";
-  if (score >= 75) return "Good";
-  if (score >= 60) return "Fair";
-  if (score >= 40) return "Needs Work";
-  return "Keep Practicing";
+  if (score >= 98) return "🏆 Flawless";
+  if (score >= 90) return "⭐ Perfect";
+  if (score >= 80) return "🎯 Excellent";
+  if (score >= 70) return "👍 Good";
+  if (score >= 58) return "📈 Fair";
+  if (score >= 45) return "🔧 Needs Work";
+  if (score >= 25) return "💪 Keep Practicing";
+  return "🌱 Just Starting";
+}
+
+function scoreTierClass(score) {
+  if (score >= 90) return "text-success fw-bold";
+  if (score >= 70) return "text-primary fw-bold";
+  if (score >= 45) return "text-warning fw-bold";
+  return "text-danger fw-bold";
 }
 
 // ============================================
@@ -1608,23 +1617,17 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
         });
 
       } else if (isPdf) {
-        // PDF — use pdf.js from CDN to extract text
+        // PDF — load pdf.js via script tag (no dynamic import)
         const arrayBuffer = await file.arrayBuffer();
-        const pdfjsLib = await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js")
-          .catch(() => null);
-
-        if (!window.pdfjsLib && !pdfjsLib) {
-          // Fallback: load via script tag
-          await new Promise((resolve, reject) => {
-            if (document.querySelector("#pdfjs-script")) { resolve(); return; }
-            const s = document.createElement("script");
-            s.id = "pdfjs-script";
-            s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-            s.onload = resolve;
-            s.onerror = () => reject(new Error("Failed to load PDF parser."));
-            document.head.appendChild(s);
-          });
-        }
+        await new Promise((resolve, reject) => {
+          if (document.querySelector("#pdfjs-script")) { resolve(); return; }
+          const s = document.createElement("script");
+          s.id = "pdfjs-script";
+          s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+          s.onload = resolve;
+          s.onerror = () => reject(new Error("Failed to load PDF parser."));
+          document.head.appendChild(s);
+        });
 
         const pdfjs = window.pdfjsLib;
         pdfjs.GlobalWorkerOptions.workerSrc =
@@ -1935,11 +1938,7 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
             <div className="tp-score-card">
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span className="tp-score-value">{sessionScoreUI}</span>
-                <span
-                  className={`tp-score-label ${
-                    sessionScoreUI >= 85 ? "excellent" : sessionScoreUI >= 65 ? "good" : "needs-work"
-                  }`}
-                >
+                <span className={`fs-5 ${scoreTierClass(sessionScoreUI)}`}>
                   {scoreLabel(sessionScoreUI)}
                 </span>
               </div>
