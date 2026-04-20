@@ -1579,19 +1579,95 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
     currentLineRef.current = currentLine;
   }, [currentLine]);
 
-  const handleFileUpload = e => {
+  const handleFileUpload = async e => {
     const file = e.target.files[0];
     if (!file) return;
-    if (!file.name.endsWith(".txt")) { setEnhanceError("Only .txt files are supported."); return; }
-    const reader = new FileReader();
-    reader.onload = event => {
-      setOriginalScript(event.target.result);
-      setEnhanceError(null);
+
+    const name = file.name.toLowerCase();
+    const isTxt = name.endsWith(".txt") || file.type === "text/plain" || file.type === "";
+    const isPdf = name.endsWith(".pdf") || file.type === "application/pdf";
+    const isDoc = name.endsWith(".doc") || name.endsWith(".docx");
+
+    if (!isTxt && !isPdf && !isDoc) {
+      setEnhanceError("Only .txt, .pdf, and .doc/.docx files are supported.");
+      return;
+    }
+
+    setEnhanceError(null);
+
+    try {
+      let text = "";
+
+      if (isTxt) {
+        // Plain text — read directly
+        text = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = ev => resolve(ev.target.result);
+          reader.onerror = () => reject(new Error("Failed to read file."));
+          reader.readAsText(file);
+        });
+
+      } else if (isPdf) {
+        // PDF — use pdf.js from CDN to extract text
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfjsLib = await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js")
+          .catch(() => null);
+
+        if (!window.pdfjsLib && !pdfjsLib) {
+          // Fallback: load via script tag
+          await new Promise((resolve, reject) => {
+            if (document.querySelector("#pdfjs-script")) { resolve(); return; }
+            const s = document.createElement("script");
+            s.id = "pdfjs-script";
+            s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+            s.onload = resolve;
+            s.onerror = () => reject(new Error("Failed to load PDF parser."));
+            document.head.appendChild(s);
+          });
+        }
+
+        const pdfjs = window.pdfjsLib;
+        pdfjs.GlobalWorkerOptions.workerSrc =
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+        const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+        const pages = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          pages.push(content.items.map(item => item.str).join(" "));
+        }
+        text = pages.join("\n");
+
+      } else if (isDoc) {
+        // DOC/DOCX — use mammoth.js from CDN
+        const arrayBuffer = await file.arrayBuffer();
+        await new Promise((resolve, reject) => {
+          if (document.querySelector("#mammoth-script")) { resolve(); return; }
+          const s = document.createElement("script");
+          s.id = "mammoth-script";
+          s.src = "https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js";
+          s.onload = resolve;
+          s.onerror = () => reject(new Error("Failed to load DOC parser."));
+          document.head.appendChild(s);
+        });
+
+        const result = await window.mammoth.extractRawText({ arrayBuffer });
+        text = result.value;
+      }
+
+      if (!text.trim()) {
+        setEnhanceError("The file appears to be empty or could not be read.");
+        return;
+      }
+
+      setOriginalScript(text.trim());
       setEnhancedData(null);
       setViewMode("edit");
-    };
-    reader.onerror = () => setEnhanceError("Failed to read the file.");
-    reader.readAsText(file);
+
+    } catch (err) {
+      setEnhanceError(err.message || "Failed to read the file.");
+    }
   };
 
   const handleEnhance = async () => {
@@ -1771,9 +1847,9 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
             className="teleprompter-upload-zone"
             onClick={() => fileInputRef.current?.click()}
           >
-            <input type="file" accept=".txt" ref={fileInputRef} onChange={handleFileUpload} />
+            <input type="file" accept=".txt,.pdf,.doc,.docx" ref={fileInputRef} onChange={handleFileUpload} />
             <span className="tp-upload-icon">📄</span>
-            <p className="tp-upload-label">Click to upload a .txt script file</p>
+            <p className="tp-upload-label">Click to upload a .txt, .pdf, or .doc file</p>
           </div>
 
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
