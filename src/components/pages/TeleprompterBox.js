@@ -1492,9 +1492,12 @@ function calculateSessionScore({ paceSummary, drift, problems, linesRead, totalL
 }
 
 function scoreLabel(score) {
+  if (score >= 95) return "Perfect";
   if (score >= 85) return "Excellent";
-  if (score >= 65) return "Good";
-  return "Needs Work";
+  if (score >= 75) return "Good";
+  if (score >= 60) return "Fair";
+  if (score >= 40) return "Needs Work";
+  return "Keep Practicing";
 }
 
 // ============================================
