@@ -1600,7 +1600,7 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
     try {
       const result = await enhanceScriptWithGroq(originalScript);
       setEnhancedData(result);
-      setViewMode("review");
+      setViewMode("practice");
     } catch (error) {
       setEnhanceError(error.message);
     } finally {
@@ -1722,13 +1722,6 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
           ✏️ Edit
         </button>
         <button
-          className={`btn btn-sm ${viewMode === "review" ? "active-mode" : ""}`}
-          onClick={() => setViewMode("review")}
-          disabled={!enhancedData || isRunning}
-        >
-          📊 Review
-        </button>
-        <button
           className={`btn btn-sm ${viewMode === "practice" ? "active-mode" : ""}`}
           onClick={() => setViewMode("practice")}
           disabled={isRunning}
@@ -1803,45 +1796,6 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
         </div>
       )}
 
-      {/* ── REVIEW MODE ── */}
-      {viewMode === "review" && enhancedData && !isEnhancing && (
-        <div className="tp-fade-in" style={{ overflowY: "auto", flex: 1 }}>
-          <div className="teleprompter-enhance-panel tp-panel-script">
-            <h6>📝 Enhanced Script</h6>
-            <div className="teleprompter-enhanced-text">{enhancedData.enhanced_script}</div>
-          </div>
-          <div className="teleprompter-enhance-panel tp-panel-points">
-            <h6>🎯 Key Points</h6>
-            <ul>{enhancedData.key_points.map((p, i) => <li key={i}>{p}</li>)}</ul>
-          </div>
-          <div className="teleprompter-enhance-panel tp-panel-memory">
-            <h6>🧠 Memory Anchors</h6>
-            <ul>{enhancedData.memory_summary.map((a, i) => <li key={i}>{a}</li>)}</ul>
-          </div>
-          <div className="teleprompter-enhance-panel tp-panel-flow">
-            <h6>📋 Flow Structure</h6>
-            <ul>
-              {enhancedData.flow_structure.map((s, i) => (
-                <li key={i}>
-                  <span style={{ color: "#a5b4fc", fontWeight: 600 }}>Step {i + 1}:</span> {s}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="teleprompter-enhance-panel tp-panel-tips">
-            <h6>🎙️ Delivery Tips</h6>
-            <ul>{enhancedData.modulation_notes.map((n, i) => <li key={i}>{n}</li>)}</ul>
-          </div>
-          <div className="tp-divider" />
-          <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn-edit" onClick={() => setViewMode("edit")}>✏️ Edit Script</button>
-            <button className="btn-practice" style={{ flex: 1 }} onClick={() => setViewMode("practice")}>
-              🎯 Start Practice
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ── PRACTICE MODE ── */}
       {viewMode === "practice" && !isEnhancing && (
         <div
@@ -1897,14 +1851,7 @@ export default function TeleprompterBox({ onStartVideo, onStopVideo }) {
             >
               ✏️ Edit
             </button>
-            {enhancedData && (
-              <button
-                className="btn-edit"
-                onClick={() => { if (isRunning) stopSession(); setViewMode("review"); }}
-              >
-                📊 Review
-              </button>
-            )}
+
           </div>
 
           {/* Score card */}
